@@ -33,8 +33,11 @@ bp = Blueprint("expenses", __name__)
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
-def read_filters():
-    """Read and validate the start, end and category query parameters."""
+def read_filters(notify=True):
+    """Read and validate the start, end and category query parameters.
+
+    notify=False skips the flash messages, for polling endpoints that would
+    otherwise pile messages into the session on every request."""
     filters = {
         "start": request.args.get("start", ""),
         "end": request.args.get("end", ""),
@@ -46,13 +49,15 @@ def read_filters():
     category = filters["category"] if filters["category"] in CATEGORIES else ""
 
     if (filters["start"] and start is None) or (filters["end"] and end is None):
-        flash("Date filter is invalid.", "error")
+        if notify:
+            flash("Date filter is invalid.", "error")
         start = end = None
     elif start and end and start > end:
-        flash("Start date must be on or before end date.", "error")
+        if notify:
+            flash("Start date must be on or before end date.", "error")
         start = end = None
 
-    if filters["category"] and not category:
+    if filters["category"] and not category and notify:
         flash("Choose a valid category filter.", "error")
 
     return {"start": start or "", "end": end or "", "category": category}
@@ -246,6 +251,45 @@ def export_pdf():
     response = Response(build_pdf(rows, filters), mimetype="application/pdf")
     response.headers["Content-Disposition"] = f'attachment; filename="{export_filename("pdf")}"'
     return response
+
+
+@bp.route("/expenses/summary.json")
+@login_required
+def summary_json():
+    """Per-category totals for the pie chart, using the same filters as the list.
+
+    Each category keeps its own slot, so its colour is the same in every view.
+    Rows with no category (possible only in old data) get a neutral slice."""
+    where, params = build_where(g.user["id"], read_filters(notify=False))
+    rows = get_db().execute(
+        f"""
+        SELECT category, SUM(amount_cents) AS cents, COUNT(*) AS count
+        FROM expenses
+        WHERE {where}
+        GROUP BY category
+        """,
+        params,
+    ).fetchall()
+    totals = {row["category"]: row for row in rows}
+
+    slices = []
+    for slot, name in enumerate(CATEGORIES):
+        if name in totals:
+            slices.append({"name": name, "cents": totals[name]["cents"], "count": totals[name]["count"], "slot": slot})
+
+    if None in totals:
+        slices.append({
+            "name": "Uncategorised",
+            "cents": totals[None]["cents"],
+            "count": totals[None]["count"],
+            "slot": None,
+        })
+
+    return {
+        "total_cents": sum(s["cents"] for s in slices),
+        "count": sum(s["count"] for s in slices),
+        "slices": slices,
+    }
 
 
 @bp.route("/expenses", methods=["POST"])

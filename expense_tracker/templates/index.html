@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/category-chart.js') }}" defer></script>
+{% endblock %}
 {% block content %}
 <section class="card">
   <h2>Add expense</h2>
@@ -15,6 +18,18 @@
     </select>
     <button type="submit">Add</button>
   </form>
+</section>
+
+<section class="card" id="category-chart" data-url="{{ url_for('expenses.summary_json') }}">
+  <h2>Spending by category</h2>
+  <div class="chart-body">
+    <svg class="pie" viewBox="0 0 200 200" role="img" aria-labelledby="pie-title">
+      <title id="pie-title">Spending by category</title>
+    </svg>
+    <ul class="pie-legend"></ul>
+  </div>
+  <p class="chart-empty muted" hidden>No expenses in this range.</p>
+  <p class="chart-status muted" aria-live="polite"></p>
 </section>
 
 <section class="card">

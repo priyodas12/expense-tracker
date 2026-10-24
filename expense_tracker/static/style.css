@@ -479,3 +479,74 @@ select {
   font-size: 1.25rem;
   line-height: 1;
 }
+
+/* Spending pie chart: one slice per category, in CATEGORIES order.
+   The 12 colours are chosen for distinct normal vision (every pair ΔE 16.5+).
+   Neighbouring slices stay distinct for deuteranopia (ΔE 14+). Slots 8 and 12
+   still look alike to a deuteranope, so the legend text carries those names.
+   Light surface only: the app has no dark theme. */
+#category-chart {
+  --chart-surface: #fcfcfb;
+  --series-1: #2a78d6;
+  --series-2: #fc3006;
+  --series-3: #16bac7;
+  --series-4: #5e07dc;
+  --series-5: #46c320;
+  --series-6: #b86798;
+  --series-7: #d29922;
+  --series-8: #ef58fe;
+  --series-9: #9c3a11;
+  --series-10: #99007a;
+  --series-11: #446401;
+  --series-12: #9b97f9;
+  --series-other: #898781; /* neutral, for uncategorised rows only */
+}
+
+.chart-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+}
+
+.pie {
+  flex: 0 0 200px;
+  width: 200px;
+  height: 200px;
+}
+
+.pie.is-hidden,
+.pie-legend.is-hidden {
+  display: none;
+}
+
+.pie-legend {
+  flex: 1 1 220px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pie-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pie-legend .swatch {
+  flex: 0 0 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.pie-legend .name {
+  flex: 1 1 auto;
+}
+
+.pie-legend .value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
