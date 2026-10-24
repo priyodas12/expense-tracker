@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Edit expense</h2>
+  <form method="post" action="{{ url_for('expenses.edit', expense_id=expense['id']) }}" class="add-form">
+    <input name="description" value="{{ expense['description'] }}" required>
+    <input name="amount" type="number" step="0.01" min="0.01" value="{{ expense['amount'] }}" required>
+    <input name="date" type="date" value="{{ expense['date'] }}" required>
+    <button type="submit">Save</button>
+    <a href="{{ url_for('expenses.index') }}" class="button-secondary">Cancel</a>
+  </form>
+</section>
+{% endblock %}

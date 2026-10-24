@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h2>Know where your money goes.</h2>
+  <p>{{ config['APP_NAME'] }} is a simple expense tracker. Record what you spend, correct mistakes, and see your totals for any date range.</p>
+  <div class="hero-actions">
+    <a href="{{ url_for('auth.register') }}" class="button">Create an account</a>
+    <a href="{{ url_for('auth.login') }}" class="button-secondary">Log in</a>
+  </div>
+</section>
+
+<section class="features">
+  <article class="card">
+    <h3>Add in seconds</h3>
+    <p>Enter a description, an amount and a date. That's all it takes.</p>
+  </article>
+  <article class="card">
+    <h3>Fix mistakes</h3>
+    <p>Edit or delete any entry whenever you need to.</p>
+  </article>
+  <article class="card">
+    <h3>Filter by date</h3>
+    <p>See spending for a week, a month, or any range you choose.</p>
+  </article>
+  <article class="card">
+    <h3>Private by default</h3>
+    <p>Your expenses are visible only to you.</p>
+  </article>
+</section>
+
+<section class="card">
+  <h2>What your list looks like</h2>
+  <p class="muted">Sample data for illustration. Your list starts empty.</p>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Description</th><th class="num">Amount</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>2026-10-22</td><td>Groceries</td><td class="num">84.20</td></tr>
+      <tr><td>2026-10-21</td><td>Metro card top-up</td><td class="num">30.00</td></tr>
+      <tr><td>2026-10-20</td><td>Dinner with friends</td><td class="num">56.75</td></tr>
+      <tr><td>2026-10-18</td><td>Electricity bill</td><td class="num">92.10</td></tr>
+      <tr><td>2026-10-15</td><td>Streaming subscription</td><td class="num">12.99</td></tr>
+    </tbody>
+    <tfoot>
+      <tr><th>Total</th><th></th><th class="num">276.04</th></tr>
+    </tfoot>
+  </table>
+</section>
+{% endblock %}

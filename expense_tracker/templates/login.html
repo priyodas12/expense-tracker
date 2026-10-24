@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Log in</h2>
+  <form method="post" action="{{ url_for('auth.login') }}" class="auth-form">
+    <input name="username" placeholder="Username" autocomplete="username" required>
+    <input name="password" type="password" placeholder="Password" autocomplete="current-password" required>
+    <button type="submit">Log in</button>
+  </form>
+  <p>No account yet? <a href="{{ url_for('auth.register') }}">Register</a></p>
+</section>
+{% endblock %}
