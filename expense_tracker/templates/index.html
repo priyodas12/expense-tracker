@@ -3,9 +3,16 @@
 <section class="card">
   <h2>Add expense</h2>
   <form method="post" action="{{ url_for('expenses.add') }}" class="add-form">
-    <input name="description" placeholder="Description" required>
-    <input name="amount" type="number" step="0.01" min="0.01" placeholder="Amount" required>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input name="description" placeholder="Description" maxlength="200" required>
+    <input name="amount" inputmode="decimal" placeholder="Amount (e.g. 12.50)" required>
     <input name="date" type="date" value="{{ today }}" required>
+    <select name="category" required>
+      <option value="" disabled selected>Category</option>
+      {% for c in categories %}
+      <option value="{{ c }}">{{ c }}</option>
+      {% endfor %}
+    </select>
     <button type="submit">Add</button>
   </form>
 </section>
@@ -13,38 +20,63 @@
 <section class="card">
   <h2>Expenses</h2>
   <form method="get" action="{{ url_for('expenses.index') }}" class="add-form filter-form">
-    <label>From <input name="start" type="date" value="{{ start }}"></label>
-    <label>To <input name="end" type="date" value="{{ end }}"></label>
+    <label>From <input name="start" type="date" value="{{ filters.start }}"></label>
+    <label>To <input name="end" type="date" value="{{ filters.end }}"></label>
+    <label>Category
+      <select name="category">
+        <option value="">All categories</option>
+        {% for c in categories %}
+        <option value="{{ c }}" {% if c == filters.category %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <button type="submit">Show</button>
-    {% if start or end %}
+    {% if filter_args %}
       <a href="{{ url_for('expenses.index') }}" class="button-secondary">Clear</a>
     {% endif %}
   </form>
 
+  <div class="summary">
+    <span>{{ count }} expense{{ '' if count == 1 else 's' }}</span>
+    <span>Total <strong>{{ total_cents|money }}</strong></span>
+    <a href="{{ url_for('expenses.export', **filter_args) }}" class="button-secondary">Export CSV</a>
+  </div>
+
   {% if expenses %}
   <table>
     <thead>
-      <tr><th>Date</th><th>Description</th><th class="num">Amount</th><th></th></tr>
+      <tr><th>Date</th><th>Description</th><th>Category</th><th class="num">Amount</th><th></th></tr>
     </thead>
     <tbody>
       {% for e in expenses %}
       <tr>
         <td>{{ e['date'] }}</td>
         <td>{{ e['description'] }}</td>
-        <td class="num">{{ "%.2f"|format(e['amount']) }}</td>
+        <td>{{ e['category'] or '' }}</td>
+        <td class="num">{{ e['amount_cents']|money }}</td>
         <td class="actions">
           <a href="{{ url_for('expenses.edit', expense_id=e['id']) }}">Edit</a>
           <form method="post" action="{{ url_for('expenses.delete', expense_id=e['id']) }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="danger">Delete</button>
           </form>
         </td>
       </tr>
       {% endfor %}
     </tbody>
-    <tfoot>
-      <tr><th>Total</th><th></th><th class="num">{{ "%.2f"|format(total) }}</th><th></th></tr>
-    </tfoot>
   </table>
+
+  {% if page_count > 1 %}
+  <nav class="pagination">
+    {% if page > 1 %}
+      <a href="{{ url_for('expenses.index', page=page - 1, **filter_args) }}">&larr; Previous</a>
+    {% endif %}
+    <span>Page {{ page }} of {{ page_count }}</span>
+    {% if page < page_count %}
+      <a href="{{ url_for('expenses.index', page=page + 1, **filter_args) }}">Next &rarr;</a>
+    {% endif %}
+  </nav>
+  {% endif %}
   {% else %}
   <p>No expenses found.</p>
   {% endif %}

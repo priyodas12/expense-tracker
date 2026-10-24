@@ -1,5 +1,24 @@
+# Virtual environment
 venv/
+.venv/
+
+# Secrets and local settings (.env.example is the tracked template)
 .env
+.env.*
+!.env.example
+
+# Databases and their backups
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.before-*.db
+
+# Logs and caches
+*.log
 __pycache__/
 .pytest_cache/
+.coverage
+htmlcov/

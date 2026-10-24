@@ -7,7 +7,7 @@ PASSWORD = "password123"
 
 @pytest.fixture
 def app(tmp_path):
-    return create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.db")})
+    return create_app("testing", {"DATABASE": str(tmp_path / "test.db")})
 
 
 @pytest.fixture

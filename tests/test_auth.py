@@ -36,13 +36,31 @@ def test_short_password_rejected(client):
     assert b"Password must be at least 8 characters." in response.data
 
 
+def test_overlong_password_rejected(client):
+    response = client.post(
+        "/auth/register",
+        data={"username": "alice", "password": "x" * 129},
+        follow_redirects=True,
+    )
+    assert b"Password must be 128 characters or fewer." in response.data
+
+
 def test_short_username_rejected(client):
     response = client.post(
         "/auth/register",
         data={"username": "al", "password": PASSWORD},
         follow_redirects=True,
     )
-    assert b"Username must be 3-30 characters." in response.data
+    assert b"Username must be 3-30 characters" in response.data
+
+
+def test_username_with_invalid_characters_rejected(client):
+    response = client.post(
+        "/auth/register",
+        data={"username": "<script>", "password": PASSWORD},
+        follow_redirects=True,
+    )
+    assert b"Username must be 3-30 characters" in response.data
 
 
 def test_wrong_password_rejected(client):
@@ -81,7 +99,10 @@ def test_logout_ends_session(user, client):
 
 def test_users_only_see_their_own_expenses(user, client):
     user("alice")
-    client.post("/expenses", data={"description": "Alice rent", "amount": "900", "date": "2026-10-01"})
+    client.post(
+        "/expenses",
+        data={"description": "Alice rent", "amount": "900", "date": "2026-10-01", "category": "Rent"},
+    )
     client.post("/auth/logout")
 
     user("bobby")

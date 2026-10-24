@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f8ff"/>
+      <stop offset="0.55" stop-color="#eef7f4"/>
+      <stop offset="1" stop-color="#fdf8ef"/>
+    </linearGradient>
+    <radialGradient id="blobBlue" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#93c5fd" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#93c5fd" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobMint" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6ee7b7" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#6ee7b7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobGold" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fcd34d" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#fcd34d" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#2563eb" fill-opacity="0.12"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <rect width="1600" height="1000" fill="url(#dots)"/>
+
+  <circle cx="200" cy="180" r="380" fill="url(#blobBlue)"/>
+  <circle cx="1450" cy="260" r="420" fill="url(#blobMint)"/>
+  <circle cx="1100" cy="950" r="460" fill="url(#blobGold)"/>
+  <circle cx="300" cy="900" r="340" fill="url(#blobMint)"/>
+
+  <!-- Gentle wave lines along the bottom -->
+  <g fill="none" stroke="#2563eb" stroke-opacity="0.08" stroke-width="3">
+    <path d="M0 780 C 200 720, 400 840, 600 780 S 1000 720, 1200 790 S 1500 840, 1600 780"/>
+    <path d="M0 830 C 220 770, 420 890, 640 830 S 1040 770, 1240 840 S 1540 890, 1600 830"/>
+    <path d="M0 880 C 240 820, 440 940, 660 880 S 1060 820, 1260 890 S 1560 940, 1600 880"/>
+  </g>
+
+  <!-- Coins, a light nod to money -->
+  <g fill="none" stroke="#d97706" stroke-opacity="0.16" stroke-width="4">
+    <circle cx="1280" cy="160" r="34"/>
+    <circle cx="1330" cy="190" r="26"/>
+    <circle cx="170" cy="640" r="30"/>
+    <circle cx="220" cy="670" r="22"/>
+  </g>
+</svg>

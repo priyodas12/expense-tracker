@@ -13,6 +13,7 @@
       {% if g.user %}
         <span>Signed in as {{ g.user['username'] }}</span>
         <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="link">Log out</button>
         </form>
       {% else %}
@@ -22,8 +23,8 @@
     </nav>
   </header>
   <main>
-    {% for message in get_flashed_messages() %}
-      <p class="flash">{{ message }}</p>
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <p class="flash flash-{{ category }}" role="status">{{ message }}</p>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>

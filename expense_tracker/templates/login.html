@@ -3,6 +3,7 @@
 <section class="card">
   <h2>Log in</h2>
   <form method="post" action="{{ url_for('auth.login') }}" class="auth-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input name="username" placeholder="Username" autocomplete="username" required>
     <input name="password" type="password" placeholder="Password" autocomplete="current-password" required>
     <button type="submit">Log in</button>

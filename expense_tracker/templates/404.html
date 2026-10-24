@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Page not found</h2>
+  <p>The page you're looking for doesn't exist, or it isn't yours to view.</p>
+  <p><a href="{{ url_for('expenses.index') }}">Go to the home page</a></p>
+</section>
+{% endblock %}
