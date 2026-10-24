@@ -111,3 +111,59 @@ def test_database_rejects_non_positive_amount(tmp_path):
         else:
             rejected = False
     assert rejected
+
+
+def test_version_one_database_keeps_rows_and_accepts_new_categories(tmp_path):
+    path = tmp_path / "v1.db"
+    with closing(sqlite3.connect(path)) as con:
+        con.executescript(
+            """
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                password_hash TEXT NOT NULL
+            );
+            CREATE TABLE expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users (id),
+                description TEXT NOT NULL CHECK (length(trim(description)) > 0),
+                amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                category TEXT CHECK (category IS NULL OR category IN ('Food', 'Rent', 'Shopping', 'Bills', 'Study', 'Travel')),
+                date TEXT NOT NULL
+            );
+            INSERT INTO users (username, password_hash) VALUES ('alice', 'x');
+            INSERT INTO expenses (user_id, description, amount_cents, date, category)
+                VALUES (1, 'Lunch', 1250, '2026-01-01', 'Food');
+            PRAGMA user_version = 1;
+            """
+        )
+
+    create_app("testing", {"DATABASE": str(path)})
+
+    with closing(sqlite3.connect(path)) as con:
+        assert con.execute("SELECT description, amount_cents, category FROM expenses").fetchall() == [
+            ("Lunch", 1250, "Food")
+        ]
+        con.execute(
+            "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
+            "VALUES (1, 'Checkup', 5000, 'Health', '2026-01-02')"
+        )
+    assert _user_version(path) == len(MIGRATIONS)
+
+
+def test_database_accepts_every_category(tmp_path):
+    from expense_tracker.validation import CATEGORIES
+
+    path = tmp_path / "all.db"
+    create_app("testing", {"DATABASE": str(path)})
+
+    with closing(sqlite3.connect(path)) as con:
+        con.execute("INSERT INTO users (username, password_hash) VALUES ('alice', 'x')")
+        for category in CATEGORIES:
+            con.execute(
+                "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
+                "VALUES (1, 'x', 100, ?, '2026-01-01')",
+                (category,),
+            )
+        count = con.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
+    assert count == len(CATEGORIES)

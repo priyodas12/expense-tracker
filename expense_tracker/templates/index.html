@@ -19,10 +19,23 @@
 
 <section class="card">
   <h2>Expenses</h2>
-  <form method="get" action="{{ url_for('expenses.index') }}" class="add-form filter-form">
-    <label>From <input name="start" type="date" value="{{ filters.start }}"></label>
-    <label>To <input name="end" type="date" value="{{ filters.end }}"></label>
-    <label>Category
+
+  <div class="toolbar">
+    <a href="{{ url_for('expenses.export_csv', **filter_args) }}" class="button-secondary">Export CSV</a>
+    <a href="{{ url_for('expenses.export_pdf', **filter_args) }}" class="button-secondary">Export PDF</a>
+  </div>
+
+  <form method="get" action="{{ url_for('expenses.index') }}" class="filter-bar">
+    <label class="field">
+      <span>From</span>
+      <input name="start" type="date" value="{{ filters.start }}">
+    </label>
+    <label class="field">
+      <span>To</span>
+      <input name="end" type="date" value="{{ filters.end }}">
+    </label>
+    <label class="field">
+      <span>Category</span>
       <select name="category">
         <option value="">All categories</option>
         {% for c in categories %}
@@ -30,16 +43,15 @@
         {% endfor %}
       </select>
     </label>
-    <button type="submit">Show</button>
-    {% if filter_args %}
+    <div class="filter-actions">
+      <button type="submit">Show</button>
       <a href="{{ url_for('expenses.index') }}" class="button-secondary">Clear</a>
-    {% endif %}
+    </div>
   </form>
 
   <div class="summary">
     <span>{{ count }} expense{{ '' if count == 1 else 's' }}</span>
     <span>Total <strong>{{ total_cents|money }}</strong></span>
-    <a href="{{ url_for('expenses.export', **filter_args) }}" class="button-secondary">Export CSV</a>
   </div>
 
   {% if expenses %}
@@ -55,7 +67,7 @@
         <td>{{ e['category'] or '' }}</td>
         <td class="num">{{ e['amount_cents']|money }}</td>
         <td class="actions">
-          <a href="{{ url_for('expenses.edit', expense_id=e['id']) }}">Edit</a>
+          <a href="{{ url_for('expenses.edit', expense_id=e['id']) }}" class="button-secondary">Edit</a>
           <form method="post" action="{{ url_for('expenses.delete', expense_id=e['id']) }}" class="inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="danger">Delete</button>

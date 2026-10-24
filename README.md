@@ -7,7 +7,7 @@ Penny Trail is an expense tracker built with Flask. Record what you spend, categ
 - **Accounts:** register, log in and log out. Passwords are hashed with Werkzeug.
 - **Private data:** each user sees and changes only their own expenses.
 - **Expenses:** add, edit and delete entries with a description, amount, date and category.
-- **Categories:** Food, Rent, Shopping, Bills, Study and Travel.
+- **Categories:** Food, Rent, Shopping, Bills, Study, Travel, Transport, Health, Entertainment, Gifts, Personal and Other.
 - **Filters:** narrow the list by date range (either end optional) and by category. The total follows the filter.
 - **Pagination:** long lists are split into pages.
 - **CSV export:** download the current filtered list as a spreadsheet. Cells that could run as formulas are neutralised.
@@ -120,7 +120,7 @@ Expense routes require a logged-in user. Requests for another user's expense ret
 - **Amount:** a positive number with at most two decimal places, up to 100,000,000.00.
 - **Date:** a valid `YYYY-MM-DD` date.
 - **Description:** required, up to 200 characters.
-- **Category:** one of the six listed above.
+- **Category:** one of the twelve listed under Features.
 - **Username:** 3–30 characters, letters, numbers, dots, dashes and underscores. Not case-sensitive.
 - **Password:** 8–128 characters.
 

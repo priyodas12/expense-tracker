@@ -1,7 +1,20 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-CATEGORIES = ("Food", "Rent", "Shopping", "Bills", "Study", "Travel")
+CATEGORIES = (
+    "Food",
+    "Rent",
+    "Shopping",
+    "Bills",
+    "Study",
+    "Travel",
+    "Transport",
+    "Health",
+    "Entertainment",
+    "Gifts",
+    "Personal",
+    "Other",
+)
 DESCRIPTION_MAX_LENGTH = 200
 MAX_AMOUNT_CENTS = 10_000_000_000  # 100,000,000.00
 

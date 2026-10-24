@@ -1,10 +1,12 @@
 import csv
 import io
 import math
-from datetime import date
+from datetime import date, datetime
+from xml.sax.saxutils import escape
 
 from flask import (
     Blueprint,
+    Response,
     abort,
     current_app,
     flash,
@@ -13,8 +15,13 @@ from flask import (
     render_template,
     request,
     url_for,
-    Response,
 )
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.enums import TA_RIGHT
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from expense_tracker.auth import login_required
 from expense_tracker.db import get_db
@@ -73,6 +80,79 @@ def build_where(user_id, filters):
 def csv_safe(value):
     text = str(value)
     return "'" + text if text.startswith(_FORMULA_PREFIXES) else text
+
+
+def export_filename(extension):
+    """Name exports by when they were made, for example 2026-10-24_10-45-30_expense.pdf."""
+    return f"{datetime.now():%Y-%m-%d_%H-%M-%S}_expense.{extension}"
+
+
+def filter_description(filters):
+    dates = "All dates"
+    if filters["start"] or filters["end"]:
+        dates = f"{filters['start'] or 'the beginning'} to {filters['end'] or 'today'}"
+    category = filters["category"] or "All categories"
+    return f"{dates}  |  {category}"
+
+
+def fetch_export_rows(filters):
+    where, params = build_where(g.user["id"], filters)
+    return get_db().execute(
+        f"SELECT date, description, category, amount_cents FROM expenses WHERE {where} ORDER BY date, id",
+        params,
+    ).fetchall()
+
+
+def build_pdf(rows, filters):
+    styles = getSampleStyleSheet()
+    cell = ParagraphStyle("cell", parent=styles["Normal"], fontSize=9, leading=11)
+    amount_cell = ParagraphStyle("amount_cell", parent=cell, alignment=TA_RIGHT)
+    total_cents = sum(row["amount_cents"] for row in rows)
+
+    header = ["Date", "Description", "Category", "Amount"]
+    data = [header]
+    for row in rows:
+        data.append([
+            Paragraph(escape(row["date"]), cell),
+            Paragraph(escape(row["description"]), cell),
+            Paragraph(escape(row["category"] or ""), cell),
+            Paragraph(format_cents(row["amount_cents"]), amount_cell),
+        ])
+    data.append(["", "", Paragraph("<b>Total</b>", cell), Paragraph(f"<b>{format_cents(total_cents)}</b>", amount_cell)])
+
+    table = Table(data, colWidths=[28 * mm, 80 * mm, 34 * mm, 28 * mm], repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563eb")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 9),
+        ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+        ("LINEBELOW", (0, 1), (-1, -2), 0.25, colors.HexColor("#d9dde3")),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.8, colors.HexColor("#1d1f23")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=20 * mm,
+        rightMargin=20 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
+        title="Expenses",
+        author=current_app.config["APP_NAME"],
+    )
+    story = [
+        Paragraph(f"{escape(current_app.config['APP_NAME'])} expenses", styles["Title"]),
+        Paragraph(f"{escape(g.user['username'])}  |  {escape(filter_description(filters))}", styles["Normal"]),
+        Spacer(1, 10),
+        table,
+    ]
+    doc.build(story)
+    return buffer.getvalue()
 
 
 def get_owned_expense(expense_id):
@@ -138,13 +218,8 @@ def index():
 
 @bp.route("/expenses/export.csv")
 @login_required
-def export():
-    filters = read_filters()
-    where, params = build_where(g.user["id"], filters)
-    rows = get_db().execute(
-        f"SELECT date, description, category, amount_cents FROM expenses WHERE {where} ORDER BY date, id",
-        params,
-    ).fetchall()
+def export_csv():
+    rows = fetch_export_rows(read_filters())
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -158,7 +233,18 @@ def export():
         ])
 
     response = Response(output.getvalue(), mimetype="text/csv")
-    response.headers["Content-Disposition"] = 'attachment; filename="expenses.csv"'
+    response.headers["Content-Disposition"] = f'attachment; filename="{export_filename("csv")}"'
+    return response
+
+
+@bp.route("/expenses/export.pdf")
+@login_required
+def export_pdf():
+    filters = read_filters()
+    rows = fetch_export_rows(filters)
+
+    response = Response(build_pdf(rows, filters), mimetype="application/pdf")
+    response.headers["Content-Disposition"] = f'attachment; filename="{export_filename("pdf")}"'
     return response
 
 

@@ -17,13 +17,15 @@ body {
   background: var(--bg) url("img/background.svg") center / cover fixed no-repeat;
   min-height: 100vh;
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  line-height: 1.5;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 header,
 main {
-  max-width: 760px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 16px;
 }
@@ -297,4 +299,183 @@ select {
 
 .filter-form select {
   flex: 1 1 160px;
+}
+
+/* Shared control height so buttons, links and inputs line up. */
+:root {
+  --control-height: 40px;
+}
+
+button,
+.button-secondary,
+a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-height);
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.button-secondary {
+  background: var(--card);
+}
+
+input,
+select {
+  height: var(--control-height);
+  line-height: 1.2;
+}
+
+.summary {
+  align-items: center;
+  min-height: var(--control-height);
+}
+
+.summary .button-secondary {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .summary .button-secondary {
+    margin-left: 0;
+  }
+}
+
+/* Export buttons, directly under the Expenses heading. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+/* Date range row: every field and button shares one height and baseline. */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.field {
+  display: flex;
+  flex: 1 1 160px;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.field input,
+.field select {
+  width: 100%;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.summary {
+  justify-content: flex-start;
+}
+
+/* Keep the date and category filters compact instead of stretching across the page. */
+.filter-bar .field {
+  flex: 0 0 180px;
+}
+
+.filter-bar .field input,
+.filter-bar .field select {
+  font-size: 0.9375rem;
+  padding: 0 10px;
+}
+
+/* Labels sit beside their inputs so every filter control is one 40px row. */
+.filter-bar {
+  align-items: center;
+}
+
+.filter-bar .field {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9375rem;
+}
+
+.filter-bar .field input {
+  width: 150px;
+}
+
+.filter-bar .field select {
+  width: 180px;
+}
+
+/* Divider between the export buttons and the filters. */
+.toolbar {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Edit and Delete in the table share one size and shape. */
+.actions {
+  justify-content: flex-end;
+}
+
+.actions form.inline {
+  display: flex;
+}
+
+.actions .button-secondary,
+.actions button {
+  height: 32px;
+  min-width: 76px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  border-radius: 6px;
+}
+
+.actions button.danger {
+  background: var(--card);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+/* One gap between every filter control: From, To, Category, Show and Clear. */
+.filter-bar,
+.filter-actions {
+  gap: 12px;
+}
+
+/* Flash messages: a row with a close button that fades out. */
+.flash {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: opacity 0.4s ease;
+}
+
+.flash-hide {
+  opacity: 0;
+}
+
+.flash .flash-close {
+  height: auto;
+  min-width: 0;
+  padding: 0 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
 }

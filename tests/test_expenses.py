@@ -311,3 +311,62 @@ def test_export_requires_login(client):
     response = client.get("/expenses/export.csv")
     assert response.status_code == 302
     assert "/auth/login" in response.headers["Location"]
+
+
+def test_export_pdf(user):
+    client = user()
+    add(client, "Lunch", "12.50", "2026-10-20", category="Food")
+
+    response = client.get("/expenses/export.pdf")
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert "attachment" in response.headers["Content-Disposition"]
+    assert response.data.startswith(b"%PDF")
+
+
+def test_export_pdf_respects_filters(user):
+    client = user()
+    add(client, "Groceries", "20", "2026-10-01", category="Food")
+    add(client, "Flat", "900", "2026-10-01", category="Rent")
+
+    filtered = client.get("/expenses/export.pdf?category=Rent")
+    everything = client.get("/expenses/export.pdf")
+    assert filtered.data.startswith(b"%PDF")
+    assert len(filtered.data) != len(everything.data)
+
+
+def test_export_pdf_requires_login(client):
+    response = client.get("/expenses/export.pdf")
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["Location"]
+
+
+def test_export_links_shown_under_heading(user):
+    client = user()
+    page = client.get("/").get_data(as_text=True)
+    assert "/expenses/export.csv" in page
+    assert "/expenses/export.pdf" in page
+    assert page.index("Export CSV") < page.index('class="filter-bar"')
+
+
+def test_new_categories_can_be_added_and_filtered(user):
+    client = user()
+    add(client, "Doctor", "40", "2026-10-01", category="Health")
+    add(client, "Movie", "12", "2026-10-02", category="Entertainment")
+
+    assert b"<td>Health</td>" in client.get("/").data
+    response = client.get("/?category=Entertainment")
+    assert b"Movie" in response.data
+    assert b"Doctor" not in response.data
+
+
+def test_export_filenames_include_date_and_time(user):
+    import re
+
+    client = user()
+    stamp = r'filename="\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_expense\.'
+
+    csv_header = client.get("/expenses/export.csv").headers["Content-Disposition"]
+    pdf_header = client.get("/expenses/export.pdf").headers["Content-Disposition"]
+    assert re.search(stamp + r'csv"', csv_header)
+    assert re.search(stamp + r'pdf"', pdf_header)

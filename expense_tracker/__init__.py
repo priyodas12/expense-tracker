@@ -47,8 +47,10 @@ def create_app(config_name=None, overrides=None):
         response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; style-src 'self'; img-src 'self' data:; "
-            "form-action 'self'; frame-ancestors 'none'",
+            "default-src 'self'; "
+            "style-src 'self' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data:; form-action 'self'; frame-ancestors 'none'",
         )
         return response
 
