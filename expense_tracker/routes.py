@@ -256,6 +256,8 @@ def index():
         page_count=page_count,
         today=date.today().isoformat(),
         budget=build_budget(g.user["id"], date.today().isoformat()),
+        month_total_cents=month_spent(g.user["id"], date.today().isoformat()),
+        month_label=date.today().strftime("%B %Y"),
         filters=filters,
         filter_args={key: value for key, value in filters.items() if value},
         list_args={
@@ -387,21 +389,24 @@ def monthly_json():
     }
 
 
+def month_spent(user_id, today):
+    """Total spent in the calendar month of today (a YYYY-MM-DD string), ignoring list filters."""
+    return get_db().execute(
+        "SELECT COALESCE(SUM(amount_cents), 0) FROM expenses WHERE user_id = ? AND substr(date, 1, 7) = ?",
+        (user_id, today[:7]),
+    ).fetchone()[0]
+
+
 def build_budget(user_id, today):
     """Return this month's spending against the user's limit, or None if no limit is set.
 
     today is a YYYY-MM-DD string. The limit applies to the calendar month of today,
     whatever date filters the list is showing."""
-    db = get_db()
-    row = db.execute("SELECT limit_cents FROM monthly_limits WHERE user_id = ?", (user_id,)).fetchone()
+    row = get_db().execute("SELECT limit_cents FROM monthly_limits WHERE user_id = ?", (user_id,)).fetchone()
     if row is None:
         return None
 
-    month = today[:7]
-    spent = db.execute(
-        "SELECT COALESCE(SUM(amount_cents), 0) FROM expenses WHERE user_id = ? AND substr(date, 1, 7) = ?",
-        (user_id, month),
-    ).fetchone()[0]
+    spent = month_spent(user_id, today)
     limit = row["limit_cents"]
 
     return {

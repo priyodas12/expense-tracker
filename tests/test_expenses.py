@@ -241,8 +241,8 @@ def test_total_respects_filters(user):
     add(client, "Groceries", "20", "2026-10-01", category="Food")
     add(client, "Flat", "900", "2026-10-01", category="Rent")
     response = client.get("/?category=Food")
-    assert b"20.00" in response.data
-    assert b"920.00" not in response.data
+    # The Total tile follows the filter. The "Spent this month" tile deliberately does not.
+    assert b'<span class="stat-label">Total</span>\n    <span class="stat-value">20.00</span>' in response.data
 
 
 def test_pagination_splits_results(user, app):

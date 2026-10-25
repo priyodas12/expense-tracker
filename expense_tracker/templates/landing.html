@@ -28,23 +28,9 @@
   </article>
 </section>
 
-<section class="card">
-  <h2>What your list looks like</h2>
-  <p class="muted">Sample data for illustration. Your list starts empty.</p>
-  <table>
-    <thead>
-      <tr><th>Date</th><th>Description</th><th>Category</th><th class="num">Amount</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>2026-10-22</td><td>Groceries</td><td>Food</td><td class="num">84.20</td></tr>
-      <tr><td>2026-10-21</td><td>Metro card top-up</td><td>Travel</td><td class="num">30.00</td></tr>
-      <tr><td>2026-10-20</td><td>Dinner with friends</td><td>Food</td><td class="num">56.75</td></tr>
-      <tr><td>2026-10-18</td><td>Electricity bill</td><td>Bills</td><td class="num">92.10</td></tr>
-      <tr><td>2026-10-15</td><td>Streaming subscription</td><td>Bills</td><td class="num">12.99</td></tr>
-    </tbody>
-    <tfoot>
-      <tr><th>Total</th><th></th><th></th><th class="num">276.04</th></tr>
-    </tfoot>
-  </table>
+<section class="card preview">
+  <h2>See your dashboard</h2>
+  <p class="muted">A sample of the signed-in view, with made-up data: this month at a glance, a monthly spend limit, your expenses and the charts.</p>
+  <img src="{{ url_for('static', filename='img/dashboard-preview.png') }}" alt="Sample Penny Trail dashboard showing this month's spending, a monthly limit with the amount left, and a list of expenses" width="1200" height="700" loading="lazy">
 </section>
 {% endblock %}

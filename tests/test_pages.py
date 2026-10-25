@@ -31,6 +31,12 @@ def test_privacy_page_renders(client):
     assert b"Your rights" in response.data
 
 
+def test_landing_page_shows_dashboard_preview(client):
+    response = client.get("/")
+    assert b'class="card preview"' in response.data
+    assert b"img/dashboard-preview.png" in response.data
+
+
 def test_policy_pages_have_no_placeholders(client):
     for path in ("/terms-and-conditions", "/privacy-policy"):
         assert b"PLACEHOLDER" not in client.get(path).data

@@ -79,13 +79,20 @@ def test_anonymous_user_sees_landing_page(client):
     assert response.status_code == 200
     assert b"Penny Trail" in response.data
     assert b"Create an account" in response.data
-    assert b"Sample data" in response.data
+    assert b"See your dashboard" in response.data
 
 
 def test_expense_pages_redirect_anonymous_user_to_login(client):
     response = client.get("/expenses/1/edit")
     assert response.status_code == 302
     assert "/auth/login" in response.headers["Location"]
+
+
+def test_logout_redirects_to_homepage(user, client):
+    user()
+    response = client.post("/auth/logout")
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/")
 
 
 def test_logout_ends_session(user, client):

@@ -97,4 +97,4 @@ def login():
 @bp.route("/logout", methods=["POST"])
 def logout():
     session.clear()
-    return redirect(url_for("auth.login"))
+    return redirect(url_for("expenses.index"))

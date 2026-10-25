@@ -4,8 +4,44 @@
 <script src="{{ url_for('static', filename='js/monthly-chart.js') }}" defer></script>
 {% endblock %}
 {% block content %}
-<section class="card">
-  <h2>Add expense</h2>
+<div class="dashboard-intro">
+  <h2>Your spending</h2>
+  <p class="muted">Everything you have recorded, with this month at a glance.</p>
+</div>
+
+<section class="stats" aria-label="Summary">
+  <div class="stat">
+    <span class="stat-label">Spent this month</span>
+    <span class="stat-value">{{ month_total_cents|money }}</span>
+    <span class="stat-note">{{ month_label }}</span>
+  </div>
+  <div class="stat">
+    {% if budget %}
+    <span class="stat-label">{{ 'Over limit' if budget.over else 'Left of limit' }}</span>
+    <span class="stat-value{% if budget.over %} over{% endif %}">{{ (budget.over_cents if budget.over else budget.remaining_cents)|money }}</span>
+    <span class="stat-note">of {{ budget.limit_cents|money }}</span>
+    {% else %}
+    <span class="stat-label">Monthly limit</span>
+    <span class="stat-value">Not set</span>
+    <span class="stat-note">Set one below</span>
+    {% endif %}
+  </div>
+  <div class="stat">
+    <span class="stat-label">Expenses</span>
+    <span class="stat-value">{{ count }}</span>
+    <span class="stat-note">{{ 'Matching filters' if filter_args else 'All time' }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Total</span>
+    <span class="stat-value">{{ total_cents|money }}</span>
+    <span class="stat-note">{{ 'Matching filters' if filter_args else 'All time' }}</span>
+  </div>
+</section>
+
+<section class="card add-card">
+  <div class="card-head">
+    <h2>Add expense</h2>
+  </div>
   <form method="post" action="{{ url_for('expenses.add') }}" class="add-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input name="description" placeholder="Description" maxlength="200" required>
@@ -23,11 +59,12 @@
 
 <div class="expenses-layout">
 <section class="card">
-  <h2>Expenses</h2>
-
-  <div class="toolbar">
-    <a href="{{ url_for('expenses.export_csv', **filter_args) }}" class="button-secondary">Export CSV</a>
-    <a href="{{ url_for('expenses.export_pdf', **filter_args) }}" class="button-secondary">Export PDF</a>
+  <div class="card-head">
+    <h2>Expenses</h2>
+    <div class="toolbar">
+      <a href="{{ url_for('expenses.export_csv', **filter_args) }}" class="button-secondary">Export CSV</a>
+      <a href="{{ url_for('expenses.export_pdf', **filter_args) }}" class="button-secondary">Export PDF</a>
+    </div>
   </div>
 
   <form method="get" action="{{ url_for('expenses.index') }}" class="filter-bar">
@@ -56,41 +93,38 @@
     </div>
   </form>
 
-  <div class="summary">
-    <span>{{ count }} expense{{ '' if count == 1 else 's' }}</span>
-    <span>Total <strong>{{ total_cents|money }}</strong></span>
-  </div>
-
   {% if expenses %}
-  <table>
-    <thead>
-      <tr>
-        {% for h in sort_headers %}
-        <th{% if h.key == 'amount' %} class="num"{% endif %} aria-sort="{{ ('ascending' if direction == 'asc' else 'descending') if h.active else 'none' }}">
-          <a href="{{ url_for('expenses.index', **dict(filter_args, sort=h.key, dir=h.next_dir)) }}">{{ h.label }}{% if h.active %} <span aria-hidden="true">{{ '▲' if direction == 'asc' else '▼' }}</span>{% endif %}</a>
-        </th>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          {% for h in sort_headers %}
+          <th{% if h.key == 'amount' %} class="num"{% endif %} aria-sort="{{ ('ascending' if direction == 'asc' else 'descending') if h.active else 'none' }}">
+            <a href="{{ url_for('expenses.index', **dict(filter_args, sort=h.key, dir=h.next_dir)) }}">{{ h.label }}{% if h.active %} <span aria-hidden="true">{{ '▲' if direction == 'asc' else '▼' }}</span>{% endif %}</a>
+          </th>
+          {% endfor %}
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td>{{ e['date'] }}</td>
+          <td>{{ e['description'] }}</td>
+          <td>{{ e['category'] or '' }}</td>
+          <td class="num">{{ e['amount_cents']|money }}</td>
+          <td class="actions">
+            <a href="{{ url_for('expenses.edit', expense_id=e['id']) }}" class="button-secondary">Edit</a>
+            <form method="post" action="{{ url_for('expenses.delete', expense_id=e['id']) }}" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="danger">Delete</button>
+            </form>
+          </td>
+        </tr>
         {% endfor %}
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in expenses %}
-      <tr>
-        <td>{{ e['date'] }}</td>
-        <td>{{ e['description'] }}</td>
-        <td>{{ e['category'] or '' }}</td>
-        <td class="num">{{ e['amount_cents']|money }}</td>
-        <td class="actions">
-          <a href="{{ url_for('expenses.edit', expense_id=e['id']) }}" class="button-secondary">Edit</a>
-          <form method="post" action="{{ url_for('expenses.delete', expense_id=e['id']) }}" class="inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="danger">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </tbody>
+    </table>
+  </div>
 
   {% if page_count > 1 %}
   <nav class="pagination">
@@ -104,13 +138,18 @@
   </nav>
   {% endif %}
   {% else %}
-  <p>No expenses found.</p>
+  <div class="empty">
+    <p>No expenses found.</p>
+    <p class="muted">Add an expense above, or change the filters.</p>
+  </div>
   {% endif %}
 </section>
 
 <div class="side-column">
 <section class="card" id="budget">
-  <h2>Monthly spend limit</h2>
+  <div class="card-head">
+    <h2>Monthly spend limit</h2>
+  </div>
   <form method="post" action="{{ url_for('expenses.set_budget') }}" class="budget-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input name="limit" inputmode="decimal" placeholder="e.g. 1500.00" aria-label="Monthly limit amount" value="{{ budget.limit_cents|money if budget else '' }}" required>
@@ -140,7 +179,9 @@
 </section>
 
 <section class="card" id="category-chart" data-url="{{ url_for('expenses.summary_json') }}">
-  <h2>Spending by category</h2>
+  <div class="card-head">
+    <h2>Spending by category</h2>
+  </div>
   <div class="chart-body">
     <svg class="pie" viewBox="0 0 200 200" role="img" aria-labelledby="pie-title">
       <title id="pie-title">Spending by category</title>
@@ -152,7 +193,9 @@
 </section>
 
 <section class="card" id="monthly-chart" data-url="{{ url_for('expenses.monthly_json') }}">
-  <h2>Monthly spending</h2>
+  <div class="card-head">
+    <h2>Monthly spending</h2>
+  </div>
   <ol class="bars"></ol>
   <p class="chart-empty muted" hidden>No expenses in this range.</p>
   <p class="chart-status muted" aria-live="polite"></p>

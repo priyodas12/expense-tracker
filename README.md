@@ -4,8 +4,8 @@ Penny Trail is an expense tracker built with Flask. Record what you spend, categ
 
 ## Features
 
-- **Accounts:** register, log in and log out. Passwords are hashed with Werkzeug.
-- **Profile:** a round avatar at the top right of every page links to your profile. There you can upload a photo (JPEG, PNG, GIF or WebP, up to 2 MB, or remove it) and add your name, email, contact number and address. Without a photo the avatar shows your initial.
+- **Accounts:** register, log in and log out. Passwords are hashed with Werkzeug. When you are logged in, the Log out button sits under your avatar in the top-right corner. Logged-out visitors see Log in and Register in the header instead.
+- **Profile:** a round avatar at the top right of every page links to your profile. There you can upload a photo (JPEG, PNG, GIF or WebP, up to 2 MB, or remove it) and add your name, email, contact number and address. All details are optional. Without a photo the avatar shows your initial, taken from your name or username.
 - **Private data:** each user sees and changes only their own expenses.
 - **Expenses:** add, edit and delete entries with a description, amount, date and category.
 - **Categories:** Food, Rent, Shopping, Bills, Study, Travel, Transport, Health, Entertainment, Gifts, Personal and Other.
