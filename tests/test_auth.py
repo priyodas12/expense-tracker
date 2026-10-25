@@ -14,7 +14,7 @@ def test_register_and_login(client):
         data={"username": "alice", "password": PASSWORD},
         follow_redirects=True,
     )
-    assert b"Signed in as alice" in response.data
+    assert b'class="avatar-link"' in response.data
 
 
 def test_duplicate_username_rejected_case_insensitive(client):

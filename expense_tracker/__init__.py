@@ -2,13 +2,15 @@ import logging
 import os
 from datetime import date
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_wtf import CSRFProtect
 
 from config import CONFIGS
 from expense_tracker.auth import bp as auth_bp
 from expense_tracker.db import close_db, init_db
 from expense_tracker.pages import bp as pages_bp
+from expense_tracker.profile import PHOTO_UPLOAD_LIMIT, avatar_context
+from expense_tracker.profile import bp as profile_bp
 from expense_tracker.routes import bp as expenses_bp
 from expense_tracker.validation import format_cents
 
@@ -36,16 +38,28 @@ def create_app(config_name=None, overrides=None):
 
     app.logger.setLevel(logging.INFO)
 
+    @app.before_request
+    def allow_photo_upload_size():
+        # Every other request keeps the 16 KB MAX_CONTENT_LENGTH. This must be
+        # registered before CSRF protection, which reads the form body.
+        if request.endpoint == "profile.upload_photo":
+            request.max_content_length = PHOTO_UPLOAD_LIMIT
+
     csrf.init_app(app)
     app.teardown_appcontext(close_db)
     app.add_template_filter(format_cents, "money")
     app.register_blueprint(auth_bp)
     app.register_blueprint(expenses_bp)
     app.register_blueprint(pages_bp)
+    app.register_blueprint(profile_bp)
 
     @app.context_processor
     def inject_current_year():
         return {"current_year": date.today().year}
+
+    @app.context_processor
+    def inject_avatar():
+        return {"avatar": avatar_context()}
 
     @app.after_request
     def set_security_headers(response):
@@ -64,6 +78,10 @@ def create_app(config_name=None, overrides=None):
     @app.errorhandler(404)
     def not_found(error):
         return render_template("404.html"), 404
+
+    @app.errorhandler(413)
+    def too_large(error):
+        return render_template("413.html"), 413
 
     @app.errorhandler(500)
     def server_error(error):

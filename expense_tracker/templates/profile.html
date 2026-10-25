@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Profile photo</h2>
+  <div class="profile-photo">
+    {% if has_photo %}
+    <img class="avatar avatar-large" src="{{ url_for('profile.photo') }}" alt="Your profile photo">
+    {% else %}
+    <span class="avatar avatar-large avatar-initial" aria-hidden="true">{{ avatar.initial }}</span>
+    {% endif %}
+
+    <div class="photo-actions">
+      <form method="post" action="{{ url_for('profile.upload_photo') }}" enctype="multipart/form-data" class="photo-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field">
+          <span>Choose a photo (JPEG, PNG, GIF or WebP, up to 2 MB)</span>
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/gif,image/webp" required>
+        </label>
+        <button type="submit">Upload photo</button>
+      </form>
+      {% if has_photo %}
+      <form method="post" action="{{ url_for('profile.remove_photo') }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link">Remove photo</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Personal details</h2>
+  <form method="post" action="{{ url_for('profile.index') }}" class="details-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="field">
+      <span>Full name</span>
+      <input name="full_name" maxlength="100" autocomplete="name" autocapitalize="words" value="{{ details.full_name }}">
+    </label>
+    <label class="field">
+      <span>Email</span>
+      <input name="email" type="email" maxlength="254" autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" value="{{ details.email }}">
+    </label>
+    <label class="field">
+      <span>Contact number</span>
+      <input name="phone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" value="{{ details.phone }}">
+    </label>
+    <label class="field">
+      <span>Address</span>
+      <textarea name="address" rows="3" maxlength="300" autocomplete="street-address">{{ details.address }}</textarea>
+    </label>
+    <div>
+      <button type="submit">Save details</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

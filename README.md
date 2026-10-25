@@ -5,6 +5,7 @@ Penny Trail is an expense tracker built with Flask. Record what you spend, categ
 ## Features
 
 - **Accounts:** register, log in and log out. Passwords are hashed with Werkzeug.
+- **Profile:** a round avatar at the top right of every page links to your profile. There you can upload a photo (JPEG, PNG, GIF or WebP, up to 2 MB, or remove it) and add your name, email, contact number and address. Without a photo the avatar shows your initial.
 - **Private data:** each user sees and changes only their own expenses.
 - **Expenses:** add, edit and delete entries with a description, amount, date and category.
 - **Categories:** Food, Rent, Shopping, Bills, Study, Travel, Transport, Health, Entertainment, Gifts, Personal and Other.
@@ -74,7 +75,7 @@ Put a reverse proxy such as Nginx or Caddy in front of Gunicorn to terminate HTT
 pytest
 ```
 
-The suite covers accounts, expense CRUD, validation, filters, sorting, pagination, the category and monthly charts, the monthly spend limit, CSV and PDF export, the policy pages, database migrations and security headers.
+The suite covers accounts, the profile and photo uploads, expense CRUD, validation, filters, sorting, pagination, the category and monthly charts, the monthly spend limit, CSV and PDF export, the policy pages, database migrations and security headers.
 
 ## Database
 
@@ -85,6 +86,7 @@ Current migrations:
 1. Users and expenses (converting the early float-based prototype to integer cents).
 2. Allow every category in the current list.
 3. Monthly spending limits, one optional row per user.
+4. Profiles: personal details and an optional photo, one row per user.
 
 Back up `expenses.db` before upgrading a database that holds real data.
 
@@ -102,6 +104,7 @@ expense-tracker/
 │   ├── auth.py             # register, login, logout, login_required
 │   ├── db.py               # SQLite connection and migrations
 │   ├── pages.py            # Terms & Conditions and Privacy Policy pages
+│   ├── profile.py          # profile details, avatar, photo upload and validation of images
 │   ├── routes.py           # list, sort, filter, charts, exports, expenses, monthly limit
 │   ├── validation.py       # input rules, categories, money parsing and formatting
 │   ├── templates/          # HTML pages (Jinja2), including base.html with the footer
@@ -119,6 +122,7 @@ expense-tracker/
     ├── test_expenses.py
     ├── test_monthly.py     # monthly spending endpoint
     ├── test_pages.py       # footer and policy pages
+    ├── test_profile.py     # profile details, avatar and photo uploads
     ├── test_security.py    # CSRF, headers, configuration checks
     ├── test_sorting.py     # column sorting
     └── test_summary.py     # category summary endpoint
@@ -138,17 +142,24 @@ expense-tracker/
 | POST       | `/expenses/<id>/delete`      | Delete an expense.                                                          |
 | POST       | `/budget`                    | Set or update this month's spending limit.                                  |
 | POST       | `/budget/delete`             | Remove the spending limit.                                                  |
+| GET, POST  | `/profile`                   | Show or save your name, email, contact number and address.                  |
+| GET        | `/profile/photo`             | Your profile photo. Returns 404 if none is set.                             |
+| POST       | `/profile/photo/upload`      | Upload a profile photo (up to 2 MB).                                        |
+| POST       | `/profile/photo/remove`      | Remove your profile photo.                                                  |
 | GET        | `/terms-and-conditions`      | Terms & Conditions.                                                         |
 | GET        | `/privacy-policy`            | Privacy Policy.                                                             |
 | GET, POST  | `/auth/register`             | Create an account.                                                          |
 | GET, POST  | `/auth/login`                | Log in.                                                                     |
 | POST       | `/auth/logout`               | Log out.                                                                    |
 
-Expense, chart, export and budget routes require a logged-in user. Requests for another user's expense return 404. Each user's spending limit is private to them.
+Expense, chart, export, budget and profile routes require a logged-in user. Requests for another user's expense return 404. Each user's spending limit and profile, including the photo, is private to them.
+
+Profile photos are stored in the database, not on disk, so backups of `expenses.db` include them. Uploads are checked by their file signature, not their filename, so only real JPEG, PNG, GIF and WebP images are accepted. The upload route accepts bodies up to 2 MB plus a small allowance for the form envelope. Every other route keeps the 16 KB request limit.
 
 ## Validation rules
 
 - **Amount:** a positive number with at most two decimal places, up to 100,000,000.00. The monthly limit uses the same rule.
+- **Profile:** all fields optional. Name up to 100 characters, email a valid address up to 254 characters, contact number 20 characters or fewer with at least 7 digits (digits, spaces, `+`, `-` and brackets only), address up to 300 characters.
 - **Date:** a valid `YYYY-MM-DD` date.
 - **Description:** required, up to 200 characters.
 - **Category:** one of the twelve listed under Features.

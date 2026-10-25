@@ -32,6 +32,7 @@ main {
 
 header {
   padding-top: 24px;
+  padding-bottom: 24px;
 }
 
 header h1 {
@@ -683,6 +684,117 @@ select {
 
 .budget-clear button.link {
   font-size: 0.875rem;
+}
+
+/* Account avatar, pinned to the top right of the header. */
+header {
+  position: relative;
+}
+
+header h1 {
+  padding-right: 56px;
+}
+
+/* Avatar with the Log out option directly beneath it, top right. */
+.account {
+  position: absolute;
+  top: 24px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.account form.inline {
+  display: block;
+}
+
+.account button.link {
+  height: auto;
+  min-width: 0;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.avatar {
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+.avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.avatar-large {
+  width: 96px;
+  height: 96px;
+  font-size: 2rem;
+}
+
+/* Profile page. */
+.profile-photo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+}
+
+.photo-actions {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.photo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.details-form {
+  display: grid;
+  gap: 12px;
+  max-width: 480px;
+}
+
+/* Fields sit in a column, so the global input flex-basis would stretch them vertically. */
+.details-form input,
+.photo-form input {
+  flex: none;
+  height: var(--control-height);
+}
+
+.photo-form .field {
+  flex: none;
+}
+
+.photo-form input[type="file"] {
+  height: auto;
+  padding: 8px 10px;
+  background: var(--card);
+}
+
+.field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
 }
 
 /* Sortable column headers: look like headers, underline on hover. */

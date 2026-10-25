@@ -11,19 +11,28 @@
 </head>
 <body>
   <header>
+    {% if avatar %}
+    <div class="account">
+      <a href="{{ url_for('profile.index') }}" class="avatar-link" aria-label="Your profile">
+        {% if avatar.has_photo %}
+        <img class="avatar" src="{{ url_for('profile.photo') }}" alt="">
+        {% else %}
+        <span class="avatar avatar-initial" aria-hidden="true">{{ avatar.initial }}</span>
+        {% endif %}
+      </a>
+      <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link">Log out</button>
+      </form>
+    </div>
+    {% endif %}
     <h1><a href="{{ url_for('expenses.index') }}">{{ config['APP_NAME'] }}</a></h1>
+    {% if not g.user %}
     <nav>
-      {% if g.user %}
-        <span>Signed in as {{ g.user['username'] }}</span>
-        <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="link">Log out</button>
-        </form>
-      {% else %}
-        <a href="{{ url_for('auth.login') }}">Log in</a>
-        <a href="{{ url_for('auth.register') }}">Register</a>
-      {% endif %}
+      <a href="{{ url_for('auth.login') }}">Log in</a>
+      <a href="{{ url_for('auth.register') }}">Register</a>
     </nav>
+    {% endif %}
   </header>
   <main>
     {% for category, message in get_flashed_messages(with_categories=true) %}

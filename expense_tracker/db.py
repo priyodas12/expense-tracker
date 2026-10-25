@@ -106,9 +106,24 @@ def _migrate_v3(db):
     """)
 
 
+def _migrate_v4(db):
+    """Add one profile per user: personal details and an optional photo."""
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS profiles (
+            user_id INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+            full_name TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            phone TEXT NOT NULL DEFAULT '',
+            address TEXT NOT NULL DEFAULT '',
+            photo BLOB,
+            photo_type TEXT
+        )
+    """)
+
+
 # Each entry upgrades the database by one version. Never edit an entry that has
 # shipped; add a new one instead.
-MIGRATIONS = [_migrate_v1, _migrate_v2, _migrate_v3]
+MIGRATIONS = [_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4]
 
 
 def init_db():

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>That upload is too large</h2>
+  <p>Photos must be 2 MB or smaller. Try a smaller image.</p>
+  <p><a href="{{ url_for('expenses.index') }}">Go to the home page</a></p>
+</section>
+{% endblock %}

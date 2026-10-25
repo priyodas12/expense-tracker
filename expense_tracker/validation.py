@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
@@ -89,5 +90,52 @@ def validate_expense(form):
         "amount_cents": amount_cents,
         "date": expense_date,
         "category": category,
+    }
+    return data, []
+
+
+PROFILE_NAME_MAX_LENGTH = 100
+PROFILE_EMAIL_MAX_LENGTH = 254
+PROFILE_PHONE_MAX_LENGTH = 20
+PROFILE_ADDRESS_MAX_LENGTH = 300
+_EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+_PHONE_PATTERN = re.compile(r"\+?[0-9 ()-]+")
+
+
+def validate_profile(form):
+    """Check the optional personal details. Empty fields are allowed.
+
+    Returns (data, errors). data is None when there are errors.
+    """
+    errors = []
+
+    full_name = form.get("full_name", "").strip()
+    if len(full_name) > PROFILE_NAME_MAX_LENGTH:
+        errors.append(f"Name must be {PROFILE_NAME_MAX_LENGTH} characters or fewer.")
+
+    email = form.get("email", "").strip()
+    if email and (len(email) > PROFILE_EMAIL_MAX_LENGTH or not _EMAIL_PATTERN.fullmatch(email)):
+        errors.append("Email must be a valid address, such as name@example.com.")
+
+    phone = form.get("phone", "").strip()
+    if phone and (
+        len(phone) > PROFILE_PHONE_MAX_LENGTH
+        or not _PHONE_PATTERN.fullmatch(phone)
+        or sum(c.isdigit() for c in phone) < 7
+    ):
+        errors.append("Phone must have at least 7 digits and use only digits, spaces, +, - or brackets.")
+
+    address = form.get("address", "").strip()
+    if len(address) > PROFILE_ADDRESS_MAX_LENGTH:
+        errors.append(f"Address must be {PROFILE_ADDRESS_MAX_LENGTH} characters or fewer.")
+
+    if errors:
+        return None, errors
+
+    data = {
+        "full_name": full_name,
+        "email": email,
+        "phone": phone,
+        "address": address,
     }
     return data, []
