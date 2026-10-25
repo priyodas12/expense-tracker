@@ -10,7 +10,7 @@ class Config:
     APP_NAME = "Penny Trail"
     SECRET_KEY = os.environ.get("SECRET_KEY")
     DATABASE = os.environ.get("DATABASE", os.path.join(BASE_DIR, "expenses.db"))
-    PER_PAGE = 20
+    PER_PAGE = 15
 
     DEBUG = False
     TESTING = False

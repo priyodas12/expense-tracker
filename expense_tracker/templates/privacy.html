@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card legal">
+  <h2>Privacy Policy</h2>
+  <p class="muted">Effective date: 25 October 2026 &middot; Last updated: 25 October 2026</p>
+
+  <p>This Privacy Policy explains how Example Operator Ltd. ("we", "us", "our") collects, uses, stores and protects personal information when you use {{ config['APP_NAME'] }} (the "Service"). It should be read together with our <a href="{{ url_for('pages.terms') }}">Terms &amp; Conditions</a>.</p>
+
+  <h3>1. Who is responsible for your data</h3>
+  <p>Example Operator Ltd., 123 Example Street, Sample City, 00000, Exampleland, is the controller of the personal information described here. You can reach our privacy team at <a href="mailto:privacy@example.com">privacy@example.com</a>.</p>
+
+  <h3>2. Information we collect</h3>
+  <ul>
+    <li><strong>Account details:</strong> the username you choose. We do not ask for or store your email address, name or phone number.</li>
+    <li><strong>Password:</strong> we never store your password in readable form. We store only a salted hash generated with a one-way algorithm, which we cannot reverse.</li>
+    <li><strong>Expense records:</strong> the description, amount, date and category of each expense you enter, and the time each record was created.</li>
+    <li><strong>Session data:</strong> a signed session cookie that keeps you logged in, and a security token that protects forms against cross-site request forgery.</li>
+    <li><strong>Technical and security logs:</strong> our application records your username when you register and when a login attempt fails. Our hosting provider keeps standard server logs, which may include your IP address, browser type and request times, for security and troubleshooting.</li>
+  </ul>
+  <p>We do not use advertising trackers, third-party analytics or social media tracking pixels.</p>
+
+  <h3>3. How we use your information</h3>
+  <ul>
+    <li>to create and secure your account and let you log in;</li>
+    <li>to store, display, edit, filter, summarise and export your expense records;</li>
+    <li>to detect, prevent and respond to security incidents, abuse and failed login attempts;</li>
+    <li>to diagnose faults and keep the Service running;</li>
+    <li>to comply with legal obligations and to enforce our Terms.</li>
+  </ul>
+  <p>Our legal bases under the EU and UK General Data Protection Regulation are performance of a contract (providing the Service you asked for), our legitimate interests in keeping the Service secure and reliable, and compliance with legal obligations where they apply.</p>
+
+  <h3>4. Cookies</h3>
+  <p>We use only strictly necessary cookies. The session cookie is marked HTTP-only and uses the SameSite "Lax" setting, so scripts on other websites cannot read it. Because these cookies are essential to the Service, they do not require consent. We do not set advertising or tracking cookies.</p>
+
+  <h3>5. Fonts and third-party requests</h3>
+  <p>The Service loads the Inter typeface from Google Fonts. When your browser requests the font, Google receives your IP address and basic browser information. Google processes that data under its own <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Privacy Policy</a>. No other third-party services receive your personal information.</p>
+
+  <h3>6. Who we share information with</h3>
+  <p>We do not sell your personal information. We share it only:</p>
+  <ul>
+    <li>with our hosting and infrastructure providers, who process it on our instructions under a data processing agreement;</li>
+    <li>where required by law, a court order or a valid legal process;</li>
+    <li>to protect the rights, property or safety of our users or the public.</li>
+  </ul>
+
+  <h3>7. International transfers</h3>
+  <p>Our hosting provider may store data outside your country. Where personal data is transferred outside the European Economic Area or the United Kingdom, we rely on approved safeguards, such as Standard Contractual Clauses, to protect it.</p>
+
+  <h3>8. How long we keep your information</h3>
+  <ul>
+    <li><strong>Active accounts:</strong> your account and expense records are kept for as long as your account is active.</li>
+    <li><strong>Deleted accounts:</strong> when we delete your account, your expense records are deleted with it. Copies remaining in encrypted backups are removed within 30 days.</li>
+    <li><strong>Server logs:</strong> standard server logs are kept for up to 30 days, then deleted.</li>
+  </ul>
+
+  <h3>9. Security</h3>
+  <p>We protect your information with measures including salted password hashing, protection against cross-site request forgery, HTTP-only and SameSite session cookies, a limit on the size of form submissions, and access controls that ensure each expense is visible only to the account that created it. In production, session cookies are sent only over HTTPS. No system is completely secure, so please choose a strong, unique password and tell us promptly if you suspect misuse of your account.</p>
+
+  <h3>10. Your rights</h3>
+  <p>Depending on where you live, you may have the right to:</p>
+  <ul>
+    <li><strong>access</strong> the personal information we hold about you;</li>
+    <li><strong>correct</strong> inaccurate information. You can edit any expense in the app at any time;</li>
+    <li><strong>export</strong> your expense records. You can download them as CSV or PDF from the app;</li>
+    <li><strong>delete</strong> your account and personal information;</li>
+    <li><strong>restrict or object</strong> to certain processing, and <strong>withdraw consent</strong> where processing is based on it;</li>
+    <li><strong>complain</strong> to your local data protection authority.</li>
+  </ul>
+  <p>To use any of these rights, email <a href="mailto:privacy@example.com">privacy@example.com</a> and include your username so we can verify your request. We do not hold an email address for your account, so we may ask you for other details to confirm your identity. We will respond within 30 days. We do not charge for reasonable requests.</p>
+
+  <h3>11. Children</h3>
+  <p>The Service is not intended for anyone under 16, or the age of digital consent in your country. We do not knowingly collect personal information from children. If you believe a child has created an account, contact us and we will delete it.</p>
+
+  <h3>12. Changes to this Policy</h3>
+  <p>We may update this Privacy Policy from time to time. We will post the revised version here and update the "Last updated" date. For material changes we will notify you at least 30 days in advance.</p>
+
+  <h3>13. Contact and Data Protection Officer</h3>
+  <p>Example Operator Ltd.<br>
+  123 Example Street, Sample City, 00000, Exampleland<br>
+  Privacy enquiries: <a href="mailto:privacy@example.com">privacy@example.com</a><br>
+  Data Protection Officer: <a href="mailto:dpo@example.com">dpo@example.com</a></p>
+</section>
+{% endblock %}

@@ -25,7 +25,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from expense_tracker.auth import login_required
 from expense_tracker.db import get_db
-from expense_tracker.validation import CATEGORIES, format_cents, parse_date, validate_expense
+from expense_tracker.validation import CATEGORIES, format_cents, parse_amount_cents, parse_date, validate_expense
 
 bp = Blueprint("expenses", __name__)
 
@@ -178,6 +178,44 @@ def read_expense_form():
     return data
 
 
+# Sortable list columns. Only these fixed SQL fragments are ever joined into ORDER BY.
+SORT_COLUMNS = {
+    "date": "date",
+    "description": "description COLLATE NOCASE",
+    "category": "category",
+    "amount": "amount_cents",
+}
+SORT_LABELS = {"date": "Date", "description": "Description", "category": "Category", "amount": "Amount"}
+
+
+def read_sort():
+    """Return the sort column and direction from the query string.
+
+    Unknown values fall back to the defaults: newest date first."""
+    column = request.args.get("sort", "date")
+    if column not in SORT_COLUMNS:
+        column = "date"
+    direction = request.args.get("dir", "desc")
+    if direction not in ("asc", "desc"):
+        direction = "desc"
+    return column, direction
+
+
+def sort_headers(column, direction):
+    """One header per sortable column. The active column's link flips its direction;
+    any other column starts ascending."""
+    headers = []
+    for key, label in SORT_LABELS.items():
+        active = key == column
+        headers.append({
+            "key": key,
+            "label": label,
+            "next_dir": "desc" if active and direction == "asc" else "asc",
+            "active": active,
+        })
+    return headers
+
+
 @bp.route("/")
 def index():
     if g.user is None:
@@ -185,6 +223,8 @@ def index():
 
     filters = read_filters()
     where, params = build_where(g.user["id"], filters)
+    column, direction = read_sort()
+    order = f"{SORT_COLUMNS[column]} {direction.upper()}, id {direction.upper()}"
     db = get_db()
 
     summary = db.execute(
@@ -201,7 +241,7 @@ def index():
         SELECT id, description, amount_cents, date, category
         FROM expenses
         WHERE {where}
-        ORDER BY date DESC, id DESC
+        ORDER BY {order}
         LIMIT ? OFFSET ?
         """,
         [*params, per_page, (page - 1) * per_page],
@@ -215,8 +255,17 @@ def index():
         page=page,
         page_count=page_count,
         today=date.today().isoformat(),
+        budget=build_budget(g.user["id"], date.today().isoformat()),
         filters=filters,
         filter_args={key: value for key, value in filters.items() if value},
+        list_args={
+            **{key: value for key, value in filters.items() if value},
+            "sort": column,
+            "dir": direction,
+        },
+        sort=column,
+        direction=direction,
+        sort_headers=sort_headers(column, direction),
         categories=CATEGORIES,
     )
 
@@ -290,6 +339,111 @@ def summary_json():
         "count": sum(s["count"] for s in slices),
         "slices": slices,
     }
+
+
+def month_span(first, last):
+    """Yield every YYYY-MM from first to last inclusive, so empty months show as zero bars."""
+    year, month = int(first[:4]), int(first[5:7])
+    last_year, last_month = int(last[:4]), int(last[5:7])
+    while (year, month) <= (last_year, last_month):
+        yield f"{year:04d}-{month:02d}"
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+
+
+@bp.route("/expenses/monthly.json")
+@login_required
+def monthly_json():
+    """Monthly totals for the bar chart, using the same filters as the list.
+
+    Months with no expenses between the first and last month are included
+    with zero, so the bars line up on a true timeline."""
+    where, params = build_where(g.user["id"], read_filters(notify=False))
+    rows = get_db().execute(
+        f"""
+        SELECT substr(date, 1, 7) AS month, SUM(amount_cents) AS cents, COUNT(*) AS count
+        FROM expenses
+        WHERE {where}
+        GROUP BY month
+        ORDER BY month
+        """,
+        params,
+    ).fetchall()
+    totals = {row["month"]: row for row in rows}
+
+    months = []
+    if rows:
+        for month in month_span(rows[0]["month"], rows[-1]["month"]):
+            found = totals.get(month)
+            months.append({
+                "month": month,
+                "cents": found["cents"] if found else 0,
+                "count": found["count"] if found else 0,
+            })
+
+    return {
+        "total_cents": sum(m["cents"] for m in months),
+        "count": sum(m["count"] for m in months),
+        "months": months,
+    }
+
+
+def build_budget(user_id, today):
+    """Return this month's spending against the user's limit, or None if no limit is set.
+
+    today is a YYYY-MM-DD string. The limit applies to the calendar month of today,
+    whatever date filters the list is showing."""
+    db = get_db()
+    row = db.execute("SELECT limit_cents FROM monthly_limits WHERE user_id = ?", (user_id,)).fetchone()
+    if row is None:
+        return None
+
+    month = today[:7]
+    spent = db.execute(
+        "SELECT COALESCE(SUM(amount_cents), 0) FROM expenses WHERE user_id = ? AND substr(date, 1, 7) = ?",
+        (user_id, month),
+    ).fetchone()[0]
+    limit = row["limit_cents"]
+
+    return {
+        "limit_cents": limit,
+        "spent_cents": spent,
+        "remaining_cents": max(0, limit - spent),
+        "over_cents": max(0, spent - limit),
+        "percent": min(100, round(spent * 100 / limit, 1)),
+        "over": spent > limit,
+        "month_label": date.fromisoformat(today).strftime("%B %Y"),
+    }
+
+
+@bp.route("/budget", methods=["POST"])
+@login_required
+def set_budget():
+    cents = parse_amount_cents(request.form.get("limit", ""))
+    if cents is None:
+        flash("Monthly limit must be a positive amount with at most two decimal places.", "error")
+        return redirect(url_for("expenses.index"))
+
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO monthly_limits (user_id, limit_cents) VALUES (?, ?)
+        ON CONFLICT (user_id) DO UPDATE SET limit_cents = excluded.limit_cents
+        """,
+        (g.user["id"], cents),
+    )
+    db.commit()
+    flash("Monthly limit saved.", "success")
+    return redirect(url_for("expenses.index"))
+
+
+@bp.route("/budget/delete", methods=["POST"])
+@login_required
+def clear_budget():
+    db = get_db()
+    db.execute("DELETE FROM monthly_limits WHERE user_id = ?", (g.user["id"],))
+    db.commit()
+    flash("Monthly limit removed.", "success")
+    return redirect(url_for("expenses.index"))
 
 
 @bp.route("/expenses", methods=["POST"])

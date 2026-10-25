@@ -96,9 +96,19 @@ def _migrate_v2(db):
     )
 
 
+def _migrate_v3(db):
+    """Add one optional monthly spending limit per user."""
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS monthly_limits (
+            user_id INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+            limit_cents INTEGER NOT NULL CHECK (limit_cents > 0)
+        )
+    """)
+
+
 # Each entry upgrades the database by one version. Never edit an entry that has
 # shipped; add a new one instead.
-MIGRATIONS = [_migrate_v1, _migrate_v2]
+MIGRATIONS = [_migrate_v1, _migrate_v2, _migrate_v3]
 
 
 def init_db():

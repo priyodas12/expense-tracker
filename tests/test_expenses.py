@@ -260,6 +260,19 @@ def test_pagination_splits_results(user, app):
     assert last.data.count(b"<td>Item") == 1
 
 
+def test_default_page_shows_fifteen_expenses(user):
+    client = user()
+    for i in range(16):
+        add(client, f"Item{i:02d}", "1", f"2026-10-{i + 1:02d}")
+
+    first = client.get("/")
+    assert b"Page 1 of 2" in first.data
+    assert first.data.count(b"<td>Item") == 15
+
+    second = client.get("/?page=2")
+    assert second.data.count(b"<td>Item") == 1
+
+
 def test_page_number_is_clamped(user, app):
     app.config["PER_PAGE"] = 2
     client = user()

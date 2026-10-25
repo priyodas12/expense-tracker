@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import date
 
 from flask import Flask, render_template
 from flask_wtf import CSRFProtect
@@ -7,6 +8,7 @@ from flask_wtf import CSRFProtect
 from config import CONFIGS
 from expense_tracker.auth import bp as auth_bp
 from expense_tracker.db import close_db, init_db
+from expense_tracker.pages import bp as pages_bp
 from expense_tracker.routes import bp as expenses_bp
 from expense_tracker.validation import format_cents
 
@@ -39,6 +41,11 @@ def create_app(config_name=None, overrides=None):
     app.add_template_filter(format_cents, "money")
     app.register_blueprint(auth_bp)
     app.register_blueprint(expenses_bp)
+    app.register_blueprint(pages_bp)
+
+    @app.context_processor
+    def inject_current_year():
+        return {"current_year": date.today().year}
 
     @app.after_request
     def set_security_headers(response):
