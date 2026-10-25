@@ -517,6 +517,16 @@ select {
   height: 240px;
 }
 
+/* Pie chart centred in its card, with the legend stacked beneath it. */
+#category-chart .chart-body {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#category-chart .pie {
+  align-self: center;
+}
+
 .pie.is-hidden,
 .pie-legend.is-hidden {
   display: none;
