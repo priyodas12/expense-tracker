@@ -66,17 +66,17 @@ def read_filters(notify=True):
 def build_where(user_id, filters):
     """Return a SQL WHERE clause and its parameters. Only fixed SQL fragments
     are joined into the clause; every user-supplied value is a parameter."""
-    clauses = ["user_id = ?"]
+    clauses = ["user_id = %s"]
     params = [user_id]
 
     if filters["start"]:
-        clauses.append("date >= ?")
+        clauses.append("date >= %s")
         params.append(filters["start"])
     if filters["end"]:
-        clauses.append("date <= ?")
+        clauses.append("date <= %s")
         params.append(filters["end"])
     if filters["category"]:
-        clauses.append("category = ?")
+        clauses.append("category = %s")
         params.append(filters["category"])
 
     return " AND ".join(clauses), params
@@ -162,7 +162,7 @@ def build_pdf(rows, filters):
 
 def get_owned_expense(expense_id):
     expense = get_db().execute(
-        "SELECT id, description, amount_cents, date, category FROM expenses WHERE id = ? AND user_id = ?",
+        "SELECT id, description, amount_cents, date, category FROM expenses WHERE id = %s AND user_id = %s",
         (expense_id, g.user["id"]),
     ).fetchone()
     if expense is None:
@@ -181,7 +181,7 @@ def read_expense_form():
 # Sortable list columns. Only these fixed SQL fragments are ever joined into ORDER BY.
 SORT_COLUMNS = {
     "date": "date",
-    "description": "description COLLATE NOCASE",
+    "description": "lower(description)",
     "category": "category",
     "amount": "amount_cents",
 }
@@ -224,11 +224,13 @@ def index():
     filters = read_filters()
     where, params = build_where(g.user["id"], filters)
     column, direction = read_sort()
-    order = f"{SORT_COLUMNS[column]} {direction.upper()}, id {direction.upper()}"
+    # SQLite sorts NULL first ascending and last descending; match that explicitly.
+    nulls = "NULLS FIRST" if direction == "asc" else "NULLS LAST"
+    order = f"{SORT_COLUMNS[column]} {direction.upper()} {nulls}, id {direction.upper()}"
     db = get_db()
 
     summary = db.execute(
-        f"SELECT COUNT(*) AS count, COALESCE(SUM(amount_cents), 0) AS total FROM expenses WHERE {where}",
+        f"SELECT COUNT(*) AS count, COALESCE(SUM(amount_cents)::bigint, 0) AS total FROM expenses WHERE {where}",
         params,
     ).fetchone()
 
@@ -242,7 +244,7 @@ def index():
         FROM expenses
         WHERE {where}
         ORDER BY {order}
-        LIMIT ? OFFSET ?
+        LIMIT %s OFFSET %s
         """,
         [*params, per_page, (page - 1) * per_page],
     ).fetchall()
@@ -314,7 +316,7 @@ def summary_json():
     where, params = build_where(g.user["id"], read_filters(notify=False))
     rows = get_db().execute(
         f"""
-        SELECT category, SUM(amount_cents) AS cents, COUNT(*) AS count
+        SELECT category, SUM(amount_cents)::bigint AS cents, COUNT(*) AS count
         FROM expenses
         WHERE {where}
         GROUP BY category
@@ -362,7 +364,7 @@ def monthly_json():
     where, params = build_where(g.user["id"], read_filters(notify=False))
     rows = get_db().execute(
         f"""
-        SELECT substr(date, 1, 7) AS month, SUM(amount_cents) AS cents, COUNT(*) AS count
+        SELECT substr(date, 1, 7) AS month, SUM(amount_cents)::bigint AS cents, COUNT(*) AS count
         FROM expenses
         WHERE {where}
         GROUP BY month
@@ -392,9 +394,10 @@ def monthly_json():
 def month_spent(user_id, today):
     """Total spent in the calendar month of today (a YYYY-MM-DD string), ignoring list filters."""
     return get_db().execute(
-        "SELECT COALESCE(SUM(amount_cents), 0) FROM expenses WHERE user_id = ? AND substr(date, 1, 7) = ?",
+        "SELECT COALESCE(SUM(amount_cents)::bigint, 0) AS total FROM expenses "
+        "WHERE user_id = %s AND substr(date, 1, 7) = %s",
         (user_id, today[:7]),
-    ).fetchone()[0]
+    ).fetchone()["total"]
 
 
 def build_budget(user_id, today):
@@ -402,7 +405,7 @@ def build_budget(user_id, today):
 
     today is a YYYY-MM-DD string. The limit applies to the calendar month of today,
     whatever date filters the list is showing."""
-    row = get_db().execute("SELECT limit_cents FROM monthly_limits WHERE user_id = ?", (user_id,)).fetchone()
+    row = get_db().execute("SELECT limit_cents FROM monthly_limits WHERE user_id = %s", (user_id,)).fetchone()
     if row is None:
         return None
 
@@ -431,7 +434,7 @@ def set_budget():
     db = get_db()
     db.execute(
         """
-        INSERT INTO monthly_limits (user_id, limit_cents) VALUES (?, ?)
+        INSERT INTO monthly_limits (user_id, limit_cents) VALUES (%s, %s)
         ON CONFLICT (user_id) DO UPDATE SET limit_cents = excluded.limit_cents
         """,
         (g.user["id"], cents),
@@ -445,7 +448,7 @@ def set_budget():
 @login_required
 def clear_budget():
     db = get_db()
-    db.execute("DELETE FROM monthly_limits WHERE user_id = ?", (g.user["id"],))
+    db.execute("DELETE FROM monthly_limits WHERE user_id = %s", (g.user["id"],))
     db.commit()
     flash("Monthly limit removed.", "success")
     return redirect(url_for("expenses.index"))
@@ -460,7 +463,7 @@ def add():
         db.execute(
             """
             INSERT INTO expenses (user_id, description, amount_cents, date, category)
-            VALUES (:user_id, :description, :amount_cents, :date, :category)
+            VALUES (%(user_id)s, %(description)s, %(amount_cents)s, %(date)s, %(category)s)
             """,
             {**data, "user_id": g.user["id"]},
         )
@@ -481,9 +484,9 @@ def edit(expense_id):
             db.execute(
                 """
                 UPDATE expenses
-                SET description = :description, amount_cents = :amount_cents,
-                    date = :date, category = :category
-                WHERE id = :id AND user_id = :user_id
+                SET description = %(description)s, amount_cents = %(amount_cents)s,
+                    date = %(date)s, category = %(category)s
+                WHERE id = %(id)s AND user_id = %(user_id)s
                 """,
                 {**data, "id": expense_id, "user_id": g.user["id"]},
             )
@@ -499,7 +502,7 @@ def edit(expense_id):
 def delete(expense_id):
     get_owned_expense(expense_id)
     db = get_db()
-    db.execute("DELETE FROM expenses WHERE id = ? AND user_id = ?", (expense_id, g.user["id"]))
+    db.execute("DELETE FROM expenses WHERE id = %s AND user_id = %s", (expense_id, g.user["id"]))
     db.commit()
     flash("Expense deleted.", "success")
     return redirect(url_for("expenses.index"))

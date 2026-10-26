@@ -1,28 +1,53 @@
-import sqlite3
+import re
 
+import psycopg
 from flask import current_app, g
+from psycopg.conninfo import conninfo_to_dict
+from psycopg.rows import dict_row
 
-from expense_tracker.validation import CATEGORIES
-
-# Categories as they were when migration 1 shipped. Migrations must not read
-# the live CATEGORIES list, or old migrations would change when it does.
-_V1_CATEGORIES = ("Food", "Rent", "Shopping", "Bills", "Study", "Travel")
-
-USERS_TABLE = """
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT NOT NULL
+# Categories as they were when the PostgreSQL baseline was created. Migrations
+# must not read the live CATEGORIES list, or old migrations would change when it does.
+_PG_V1_CATEGORIES = (
+    "Food",
+    "Rent",
+    "Shopping",
+    "Bills",
+    "Study",
+    "Travel",
+    "Transport",
+    "Health",
+    "Entertainment",
+    "Gifts",
+    "Personal",
+    "Other",
 )
-"""
+
+# Session-level advisory lock so that several servers or workers starting at
+# once apply each migration exactly once.
+MIGRATION_LOCK_KEY = 4950112201
+
+SCHEMA_NAME_PATTERN = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
 def get_db():
     if "db" not in g:
-        db = sqlite3.connect(current_app.config["DATABASE"])
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA foreign_keys = ON")
-        g.db = db
+        url = current_app.config["DATABASE_URL"]
+        schema = current_app.config["DATABASE_SCHEMA"]
+        if not SCHEMA_NAME_PATTERN.match(schema):
+            raise RuntimeError("DATABASE_SCHEMA must be a plain lowercase identifier.")
+        try:
+            g.db = psycopg.connect(
+                url,
+                row_factory=dict_row,
+                options=f"-c search_path={schema}",
+            )
+        except psycopg.OperationalError:
+            # Name only the host and database. The URL holds the password.
+            info = conninfo_to_dict(url)
+            raise RuntimeError(
+                f"Could not connect to PostgreSQL database {info.get('dbname')!r} "
+                f"on host {info.get('host')!r}. Check DATABASE_URL and that the server is running."
+            ) from None
     return g.db
 
 
@@ -32,116 +57,84 @@ def close_db(exc=None):
         db.close()
 
 
-def _expenses_table_sql(categories):
-    category_list = ", ".join(f"'{c}'" for c in categories)
-    return f"""
-    CREATE TABLE expenses_new (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-        description TEXT NOT NULL CHECK (length(trim(description)) > 0),
-        amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
-        category TEXT CHECK (category IS NULL OR category IN ({category_list})),
-        date TEXT NOT NULL
-    )
-    """
-
-
-def _table_exists(db, name):
-    return db.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
-    ).fetchone() is not None
-
-
-def _rebuild_expenses(db, categories, copy_sql=None):
-    """Replace the expenses table with one that allows `categories`.
-
-    SQLite cannot change a CHECK constraint in place, so the table is rebuilt:
-    create the new table, copy the rows, drop the old table, and rename.
-    """
-    db.execute(_expenses_table_sql(categories))
-    if copy_sql and _table_exists(db, "expenses"):
-        db.execute(copy_sql)
-        db.execute("DROP TABLE expenses")
-    db.execute("ALTER TABLE expenses_new RENAME TO expenses")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses (user_id, date)")
-
-
 def _migrate_v1(db):
-    """Create the schema. Also converts the early prototype table, which stored
-    amounts as floats in `amount`, to integer cents in `amount_cents`."""
-    db.execute(USERS_TABLE)
-
-    copy_sql = None
-    if _table_exists(db, "expenses"):
-        columns = {row["name"] for row in db.execute("PRAGMA table_info(expenses)")}
-        category = "category" if "category" in columns else "NULL"
-        copy_sql = f"""
-            INSERT INTO expenses_new (id, user_id, description, amount_cents, category, date)
-            SELECT id, user_id, description, CAST(ROUND(amount * 100) AS INTEGER), {category}, date
-            FROM expenses
-        """
-
-    _rebuild_expenses(db, _V1_CATEGORIES, copy_sql)
-
-
-def _migrate_v2(db):
-    """Allow every category in CATEGORIES."""
-    _rebuild_expenses(
-        db,
-        CATEGORIES,
-        """
-        INSERT INTO expenses_new (id, user_id, description, amount_cents, category, date)
-        SELECT id, user_id, description, amount_cents, category, date FROM expenses
-        """,
-    )
-
-
-def _migrate_v3(db):
-    """Add one optional monthly spending limit per user."""
+    """Create the baseline schema, equal to SQLite schema version 4."""
     db.execute("""
-        CREATE TABLE IF NOT EXISTS monthly_limits (
-            user_id INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-            limit_cents INTEGER NOT NULL CHECK (limit_cents > 0)
+        CREATE TABLE users (
+            id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            username text NOT NULL,
+            password_hash text NOT NULL
+        )
+    """)
+    db.execute("CREATE UNIQUE INDEX users_username_lower ON users (lower(username))")
+
+    category_list = ", ".join(f"'{c}'" for c in _PG_V1_CATEGORIES)
+    db.execute(f"""
+        CREATE TABLE expenses (
+            id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            user_id bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+            description text NOT NULL CHECK (length(trim(description)) > 0),
+            amount_cents bigint NOT NULL CHECK (amount_cents > 0),
+            category text CHECK (category IS NULL OR category IN ({category_list})),
+            date text NOT NULL
+        )
+    """)
+    db.execute("CREATE INDEX idx_expenses_user_date ON expenses (user_id, date)")
+
+    db.execute("""
+        CREATE TABLE monthly_limits (
+            user_id bigint PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+            limit_cents bigint NOT NULL CHECK (limit_cents > 0)
         )
     """)
 
-
-def _migrate_v4(db):
-    """Add one profile per user: personal details and an optional photo."""
     db.execute("""
-        CREATE TABLE IF NOT EXISTS profiles (
-            user_id INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-            full_name TEXT NOT NULL DEFAULT '',
-            email TEXT NOT NULL DEFAULT '',
-            phone TEXT NOT NULL DEFAULT '',
-            address TEXT NOT NULL DEFAULT '',
-            photo BLOB,
-            photo_type TEXT
+        CREATE TABLE profiles (
+            user_id bigint PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+            full_name text NOT NULL DEFAULT '',
+            email text NOT NULL DEFAULT '',
+            phone text NOT NULL DEFAULT '',
+            address text NOT NULL DEFAULT '',
+            photo bytea,
+            photo_type text
         )
     """)
 
 
 # Each entry upgrades the database by one version. Never edit an entry that has
 # shipped; add a new one instead.
-MIGRATIONS = [_migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4]
+MIGRATIONS = [_migrate_v1]
 
 
 def init_db():
+    """Bring the database to the latest schema version, under the migration lock."""
     db = get_db()
-    current = db.execute("PRAGMA user_version").fetchone()[0]
+    db.execute("SELECT pg_advisory_lock(%s)", (MIGRATION_LOCK_KEY,))
+    db.commit()
+    try:
+        db.execute("CREATE TABLE IF NOT EXISTS schema_version (version integer NOT NULL)")
+        db.execute(
+            "INSERT INTO schema_version (version) SELECT 0 "
+            "WHERE NOT EXISTS (SELECT 1 FROM schema_version)"
+        )
+        db.commit()
 
-    for version, migrate in enumerate(MIGRATIONS, start=1):
-        if current < version:
-            _apply(db, version, migrate)
+        current = db.execute("SELECT version FROM schema_version").fetchone()["version"]
+        for version, migrate in enumerate(MIGRATIONS, start=1):
+            if current < version:
+                _apply(db, version, migrate)
+    finally:
+        db.rollback()
+        db.execute("SELECT pg_advisory_unlock(%s)", (MIGRATION_LOCK_KEY,))
+        db.commit()
 
 
 def _apply(db, version, migrate):
-    """Run one migration inside a transaction, so a failure leaves the database unchanged."""
-    db.execute("BEGIN")
+    """Run one migration in its own transaction, so a failure leaves the database unchanged."""
     try:
         migrate(db)
-        db.execute(f"PRAGMA user_version = {int(version)}")
-        db.execute("COMMIT")
+        db.execute("UPDATE schema_version SET version = %s", (version,))
+        db.commit()
     except Exception:
-        db.execute("ROLLBACK")
+        db.rollback()
         raise

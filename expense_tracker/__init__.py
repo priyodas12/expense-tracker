@@ -12,6 +12,7 @@ from expense_tracker.pages import bp as pages_bp
 from expense_tracker.profile import PHOTO_UPLOAD_LIMIT, avatar_context
 from expense_tracker.profile import bp as profile_bp
 from expense_tracker.routes import bp as expenses_bp
+from expense_tracker.sqlite_import import sqlite_import_cli
 from expense_tracker.validation import format_cents
 
 csrf = CSRFProtect()
@@ -35,8 +36,17 @@ def create_app(config_name=None, overrides=None):
 
     if not app.config["SECRET_KEY"]:
         raise RuntimeError("SECRET_KEY is not set. Add it to your environment or .env file.")
+    if not app.config["DATABASE_URL"]:
+        raise RuntimeError("DATABASE_URL is not set. Add it to your environment or .env file.")
 
     app.logger.setLevel(logging.INFO)
+
+    @app.before_request
+    def serve_maintenance_page():
+        # While the database is being moved, answer every request with 503 and
+        # touch nothing. Registered before any blueprint, so no user lookup runs.
+        if app.config["MAINTENANCE_MODE"] and request.endpoint != "static":
+            return render_template("maintenance.html"), 503, {"Retry-After": "3600"}
 
     @app.before_request
     def allow_photo_upload_size():
@@ -52,6 +62,7 @@ def create_app(config_name=None, overrides=None):
     app.register_blueprint(expenses_bp)
     app.register_blueprint(pages_bp)
     app.register_blueprint(profile_bp)
+    app.cli.add_command(sqlite_import_cli)
 
     @app.context_processor
     def inject_current_year():
@@ -88,7 +99,8 @@ def create_app(config_name=None, overrides=None):
         app.logger.error("Unhandled server error: %s", error)
         return render_template("500.html"), 500
 
-    with app.app_context():
-        init_db()
+    if not app.config["MAINTENANCE_MODE"]:
+        with app.app_context():
+            init_db()
 
     return app

@@ -13,6 +13,9 @@ gunicorn==26.2.0
 # Loads environment variables from a .env file
 python-dotenv==1.2.4
 
+# PostgreSQL driver (raw SQL, no ORM)
+psycopg[binary]==3.3.6
+
 # HTTP client for calling external APIs
 requests==2.34.2
 

@@ -3,7 +3,7 @@ import re
 import pytest
 
 from expense_tracker import create_app
-from tests.conftest import PASSWORD
+from tests.conftest import PASSWORD, TEST_DATABASE_URL
 
 
 def test_security_headers_present(client):
@@ -20,8 +20,15 @@ def test_not_found_uses_app_page(user):
     assert b"Page not found" in response.data
 
 
-def test_csrf_token_required_when_enabled(tmp_path):
-    app = create_app("development", {"DATABASE": str(tmp_path / "csrf.db"), "TESTING": True})
+def test_csrf_token_required_when_enabled(pg_schema):
+    app = create_app(
+        "development",
+        {
+            "DATABASE_URL": TEST_DATABASE_URL,
+            "DATABASE_SCHEMA": pg_schema,
+            "TESTING": True,
+        },
+    )
     client = app.test_client()
 
     response = client.post("/auth/register", data={"username": "alice", "password": PASSWORD})
@@ -37,12 +44,28 @@ def test_csrf_token_required_when_enabled(tmp_path):
     assert response.status_code == 302
 
 
-def test_production_requires_secret_key(tmp_path, monkeypatch):
+def test_production_requires_secret_key(pg_schema, monkeypatch):
     monkeypatch.delenv("SECRET_KEY", raising=False)
     with pytest.raises(RuntimeError, match="SECRET_KEY is not set"):
-        create_app("production", {"DATABASE": str(tmp_path / "prod.db")})
+        create_app("production", {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_SCHEMA": pg_schema})
 
 
-def test_unknown_environment_is_rejected(tmp_path):
+def test_missing_database_url_is_rejected(pg_schema, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    with pytest.raises(RuntimeError, match="DATABASE_URL is not set"):
+        create_app("testing", {"DATABASE_URL": None, "DATABASE_SCHEMA": pg_schema})
+
+
+def test_unreachable_database_error_does_not_leak_password():
+    url = "postgresql://penny:s3cret-pass@127.0.0.1:1/penny_test"
+    with pytest.raises(RuntimeError) as excinfo:
+        create_app("testing", {"DATABASE_URL": url, "DATABASE_SCHEMA": "public"})
+    message = str(excinfo.value)
+    assert "penny_test" in message
+    assert "s3cret-pass" not in message
+    assert "127.0.0.1" in message
+
+
+def test_unknown_environment_is_rejected(pg_schema):
     with pytest.raises(ValueError, match="Unknown APP_ENV"):
-        create_app("staging", {"DATABASE": str(tmp_path / "x.db")})
+        create_app("staging", {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_SCHEMA": pg_schema})

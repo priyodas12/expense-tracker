@@ -36,7 +36,7 @@ def avatar_context():
         return None
 
     row = get_db().execute(
-        "SELECT full_name, photo_type FROM profiles WHERE user_id = ?", (user["id"],)
+        "SELECT full_name, photo_type FROM profiles WHERE user_id = %s", (user["id"],)
     ).fetchone()
     name = (row["full_name"] if row and row["full_name"] else user["username"]).strip()
     return {
@@ -50,7 +50,7 @@ def avatar_context():
 def index():
     db = get_db()
     details = dict(EMPTY_DETAILS)
-    row = db.execute("SELECT * FROM profiles WHERE user_id = ?", (g.user["id"],)).fetchone()
+    row = db.execute("SELECT * FROM profiles WHERE user_id = %s", (g.user["id"],)).fetchone()
     if row:
         details.update({key: row[key] for key in EMPTY_DETAILS})
     has_photo = bool(row and row["photo_type"])
@@ -66,7 +66,7 @@ def index():
             db.execute(
                 """
                 INSERT INTO profiles (user_id, full_name, email, phone, address)
-                VALUES (:user_id, :full_name, :email, :phone, :address)
+                VALUES (%(user_id)s, %(full_name)s, %(email)s, %(phone)s, %(address)s)
                 ON CONFLICT (user_id) DO UPDATE SET
                     full_name = excluded.full_name,
                     email = excluded.email,
@@ -86,7 +86,7 @@ def index():
 @login_required
 def photo():
     row = get_db().execute(
-        "SELECT photo, photo_type FROM profiles WHERE user_id = ?", (g.user["id"],)
+        "SELECT photo, photo_type FROM profiles WHERE user_id = %s", (g.user["id"],)
     ).fetchone()
     if row is None or row["photo"] is None:
         abort(404)
@@ -118,7 +118,7 @@ def upload_photo():
     db = get_db()
     db.execute(
         """
-        INSERT INTO profiles (user_id, photo, photo_type) VALUES (?, ?, ?)
+        INSERT INTO profiles (user_id, photo, photo_type) VALUES (%s, %s, %s)
         ON CONFLICT (user_id) DO UPDATE SET photo = excluded.photo, photo_type = excluded.photo_type
         """,
         (g.user["id"], data, photo_type),
@@ -132,7 +132,7 @@ def upload_photo():
 @login_required
 def remove_photo():
     db = get_db()
-    db.execute("UPDATE profiles SET photo = NULL, photo_type = NULL WHERE user_id = ?", (g.user["id"],))
+    db.execute("UPDATE profiles SET photo = NULL, photo_type = NULL WHERE user_id = %s", (g.user["id"],))
     db.commit()
     flash("Profile photo removed.", "success")
     return redirect(url_for("profile.index"))
