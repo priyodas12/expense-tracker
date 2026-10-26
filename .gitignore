@@ -1,6 +1,7 @@
 # Virtual environment
 venv/
 .venv/
+.idea
 
 # Secrets and local settings (.env.example is the tracked template)
 .env
