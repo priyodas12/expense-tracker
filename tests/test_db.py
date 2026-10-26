@@ -1,169 +1,145 @@
-import sqlite3
-from contextlib import closing
+import threading
+
+import pytest
+from psycopg.errors import CheckViolation, UniqueViolation
 
 from expense_tracker import create_app
 from expense_tracker.db import MIGRATIONS
+from expense_tracker.validation import CATEGORIES
+from tests.conftest import TEST_DATABASE_URL
 
 
-def _columns(path, table):
-    with closing(sqlite3.connect(path)) as con:
-        return [row[1] for row in con.execute(f"PRAGMA table_info({table})")]
+def _version(db_conn):
+    return db_conn.execute("SELECT version FROM schema_version").fetchone()["version"]
 
 
-def _user_version(path):
-    with closing(sqlite3.connect(path)) as con:
-        return con.execute("PRAGMA user_version").fetchone()[0]
+def _insert_user(db_conn, username="alice"):
+    return db_conn.execute(
+        "INSERT INTO users (username, password_hash) VALUES (%s, 'x') RETURNING id",
+        (username,),
+    ).fetchone()["id"]
 
 
-def _create_prototype_database(path):
-    """Build the early schema: float amounts and a category column added later."""
-    with closing(sqlite3.connect(path)) as con:
-        con.executescript(
-            """
-            CREATE TABLE users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-                password_hash TEXT NOT NULL
-            );
-            CREATE TABLE expenses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL REFERENCES users (id),
-                description TEXT NOT NULL,
-                amount REAL NOT NULL,
-                date TEXT NOT NULL,
-                category TEXT
-            );
-            INSERT INTO users (username, password_hash) VALUES ('alice', 'x');
-            INSERT INTO expenses (user_id, description, amount, date, category)
-                VALUES (1, 'Lunch', 12.5, '2026-01-01', 'Food'),
-                       (1, 'Old thing', 3.1, '2026-01-02', NULL);
-            """
+def test_fresh_schema_reaches_latest_version(app, db_conn):
+    assert _version(db_conn) == len(MIGRATIONS)
+
+
+def test_migration_is_idempotent(app, pg_schema, db_conn):
+    create_app(
+        "testing",
+        {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_SCHEMA": pg_schema},
+    )
+    assert _version(db_conn) == len(MIGRATIONS)
+
+
+def test_expenses_table_has_expected_columns(app, db_conn):
+    columns = [
+        row["column_name"]
+        for row in db_conn.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'expenses' AND table_schema = current_schema() "
+            "ORDER BY ordinal_position"
         )
-
-
-def test_prototype_database_is_migrated(tmp_path):
-    path = tmp_path / "old.db"
-    _create_prototype_database(path)
-
-    create_app("testing", {"DATABASE": str(path)})
-
-    assert "amount_cents" in _columns(path, "expenses")
-    assert "amount" not in _columns(path, "expenses")
-    assert _user_version(path) == len(MIGRATIONS)
-
-    with closing(sqlite3.connect(path)) as con:
-        rows = con.execute(
-            "SELECT description, amount_cents, category FROM expenses ORDER BY id"
-        ).fetchall()
-    assert rows == [("Lunch", 1250, "Food"), ("Old thing", 310, None)]
-
-
-def test_migration_is_idempotent(tmp_path):
-    path = tmp_path / "test.db"
-    create_app("testing", {"DATABASE": str(path)})
-    create_app("testing", {"DATABASE": str(path)})
-    assert _user_version(path) == len(MIGRATIONS)
-
-
-def test_fresh_database_has_expected_schema(tmp_path):
-    path = tmp_path / "fresh.db"
-    create_app("testing", {"DATABASE": str(path)})
-
-    assert _columns(path, "expenses") == [
-        "id", "user_id", "description", "amount_cents", "category", "date",
     ]
-    with closing(sqlite3.connect(path)) as con:
-        indexes = [row[1] for row in con.execute("PRAGMA index_list(expenses)")]
-    assert "idx_expenses_user_date" in indexes
+    assert columns == ["id", "user_id", "description", "amount_cents", "category", "date"]
 
 
-def test_database_rejects_invalid_category(tmp_path):
-    path = tmp_path / "check.db"
-    create_app("testing", {"DATABASE": str(path)})
-
-    with closing(sqlite3.connect(path)) as con:
-        con.execute("INSERT INTO users (username, password_hash) VALUES ('alice', 'x')")
-        try:
-            con.execute(
-                "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
-                "VALUES (1, 'x', 100, 'Gadgets', '2026-01-01')"
-            )
-        except sqlite3.IntegrityError:
-            rejected = True
-        else:
-            rejected = False
-    assert rejected
+def test_user_expense_index_exists(app, db_conn):
+    row = db_conn.execute(
+        "SELECT 1 AS found FROM pg_indexes "
+        "WHERE tablename = 'expenses' AND indexname = 'idx_expenses_user_date' "
+        "AND schemaname = current_schema()"
+    ).fetchone()
+    assert row is not None
 
 
-def test_database_rejects_non_positive_amount(tmp_path):
-    path = tmp_path / "check.db"
-    create_app("testing", {"DATABASE": str(path)})
-
-    with closing(sqlite3.connect(path)) as con:
-        con.execute("INSERT INTO users (username, password_hash) VALUES ('alice', 'x')")
-        try:
-            con.execute(
-                "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
-                "VALUES (1, 'x', 0, 'Food', '2026-01-01')"
-            )
-        except sqlite3.IntegrityError:
-            rejected = True
-        else:
-            rejected = False
-    assert rejected
-
-
-def test_version_one_database_keeps_rows_and_accepts_new_categories(tmp_path):
-    path = tmp_path / "v1.db"
-    with closing(sqlite3.connect(path)) as con:
-        con.executescript(
-            """
-            CREATE TABLE users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-                password_hash TEXT NOT NULL
-            );
-            CREATE TABLE expenses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL REFERENCES users (id),
-                description TEXT NOT NULL CHECK (length(trim(description)) > 0),
-                amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
-                category TEXT CHECK (category IS NULL OR category IN ('Food', 'Rent', 'Shopping', 'Bills', 'Study', 'Travel')),
-                date TEXT NOT NULL
-            );
-            INSERT INTO users (username, password_hash) VALUES ('alice', 'x');
-            INSERT INTO expenses (user_id, description, amount_cents, date, category)
-                VALUES (1, 'Lunch', 1250, '2026-01-01', 'Food');
-            PRAGMA user_version = 1;
-            """
-        )
-
-    create_app("testing", {"DATABASE": str(path)})
-
-    with closing(sqlite3.connect(path)) as con:
-        assert con.execute("SELECT description, amount_cents, category FROM expenses").fetchall() == [
-            ("Lunch", 1250, "Food")
-        ]
-        con.execute(
+def test_database_rejects_invalid_category(app, db_conn):
+    user_id = _insert_user(db_conn)
+    with pytest.raises(CheckViolation):
+        db_conn.execute(
             "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
-            "VALUES (1, 'Checkup', 5000, 'Health', '2026-01-02')"
+            "VALUES (%s, 'x', 100, 'Gadgets', '2026-01-01')",
+            (user_id,),
         )
-    assert _user_version(path) == len(MIGRATIONS)
 
 
-def test_database_accepts_every_category(tmp_path):
-    from expense_tracker.validation import CATEGORIES
+def test_database_rejects_non_positive_amount(app, db_conn):
+    user_id = _insert_user(db_conn)
+    with pytest.raises(CheckViolation):
+        db_conn.execute(
+            "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
+            "VALUES (%s, 'x', 0, 'Food', '2026-01-01')",
+            (user_id,),
+        )
 
-    path = tmp_path / "all.db"
-    create_app("testing", {"DATABASE": str(path)})
 
-    with closing(sqlite3.connect(path)) as con:
-        con.execute("INSERT INTO users (username, password_hash) VALUES ('alice', 'x')")
-        for category in CATEGORIES:
-            con.execute(
-                "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
-                "VALUES (1, 'x', 100, ?, '2026-01-01')",
-                (category,),
-            )
-        count = con.execute("SELECT COUNT(*) FROM expenses").fetchone()[0]
+def test_database_rejects_blank_description(app, db_conn):
+    user_id = _insert_user(db_conn)
+    with pytest.raises(CheckViolation):
+        db_conn.execute(
+            "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
+            "VALUES (%s, '   ', 100, 'Food', '2026-01-01')",
+            (user_id,),
+        )
+
+
+def test_database_accepts_every_category(app, db_conn):
+    user_id = _insert_user(db_conn)
+    for category in CATEGORIES:
+        db_conn.execute(
+            "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
+            "VALUES (%s, 'x', 100, %s, '2026-01-01')",
+            (user_id, category),
+        )
+    count = db_conn.execute("SELECT COUNT(*) AS n FROM expenses").fetchone()["n"]
     assert count == len(CATEGORIES)
+
+
+def test_username_uniqueness_ignores_case(app, db_conn):
+    _insert_user(db_conn, "alice")
+    with pytest.raises(UniqueViolation):
+        _insert_user(db_conn, "ALICE")
+
+
+def test_deleting_user_cascades_to_owned_rows(app, db_conn):
+    user_id = _insert_user(db_conn)
+    db_conn.execute(
+        "INSERT INTO expenses (user_id, description, amount_cents, category, date) "
+        "VALUES (%s, 'x', 100, 'Food', '2026-01-01')",
+        (user_id,),
+    )
+    db_conn.execute("INSERT INTO monthly_limits (user_id, limit_cents) VALUES (%s, 5000)", (user_id,))
+    db_conn.execute("INSERT INTO profiles (user_id) VALUES (%s)", (user_id,))
+
+    db_conn.execute("DELETE FROM users WHERE id = %s", (user_id,))
+
+    for table in ("expenses", "monthly_limits", "profiles"):
+        remaining = db_conn.execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()["n"]
+        assert remaining == 0, table
+
+
+def test_concurrent_startup_applies_migrations_once(pg_schema, db_conn):
+    """Several workers starting together must not race on the schema."""
+    barrier = threading.Barrier(4)
+    errors = []
+
+    def start():
+        try:
+            barrier.wait()
+            create_app(
+                "testing",
+                {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_SCHEMA": pg_schema},
+            )
+        except Exception as exc:  # pragma: no cover - reported below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=start) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert _version(db_conn) == len(MIGRATIONS)
+    rows = db_conn.execute("SELECT COUNT(*) AS n FROM schema_version").fetchone()["n"]
+    assert rows == 1

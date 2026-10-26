@@ -9,7 +9,9 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 class Config:
     APP_NAME = "Penny Trail"
     SECRET_KEY = os.environ.get("SECRET_KEY")
-    DATABASE = os.environ.get("DATABASE", os.path.join(BASE_DIR, "expenses.db"))
+    DATABASE_URL = os.environ.get("DATABASE_URL")
+    DATABASE_SCHEMA = os.environ.get("DATABASE_SCHEMA", "public")
+    MAINTENANCE_MODE = os.environ.get("MAINTENANCE_MODE", "").strip().lower() in ("1", "true", "yes")
     PER_PAGE = 15
 
     DEBUG = False

@@ -23,6 +23,8 @@ Penny Trail is an expense tracker built with Flask. Record what you spend, categ
 ## Requirements
 
 - Python 3.14 (any recent Python 3 should work)
+- PostgreSQL 17 for the database. For development and tests, Docker Compose starts one for you (see below).
+- Docker with the Compose plugin, for the local development database
 
 ## Setup
 
@@ -31,17 +33,23 @@ python3 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env            # then edit it
+docker compose up -d            # local PostgreSQL for development and tests
 ```
+
+`docker compose up -d` starts PostgreSQL with a development user (`penny`) and two databases: `penny_dev` for the app and `penny_test` for the tests. The credentials are development-only placeholders. Stop it with `docker compose down`, or remove its data with `docker compose down -v`.
 
 ## Configuration
 
 Settings come from environment variables, or from a `.env` file in the project root. See `.env.example`.
 
-| Variable     | Default                      | Purpose                                                                 |
-|--------------|------------------------------|-------------------------------------------------------------------------|
-| `APP_ENV`    | `development`                | `development`, `testing` or `production`. Production enables secure cookies. |
-| `SECRET_KEY` | `dev-secret-change-me` (development only) | Signs sessions and CSRF tokens. **Required in production.** |
-| `DATABASE`   | `expenses.db` in project root | Path to the SQLite database file.                                      |
+| Variable           | Default                      | Purpose                                                                 |
+|--------------------|------------------------------|-------------------------------------------------------------------------|
+| `APP_ENV`          | `development`                | `development`, `testing` or `production`. Production enables secure cookies. |
+| `SECRET_KEY`       | `dev-secret-change-me` (development only) | Signs sessions and CSRF tokens. **Required in production.** Must be identical on every server. |
+| `DATABASE_URL`     | none (**required**)          | PostgreSQL connection URL, e.g. `postgresql://user:password@host:5432/dbname`. |
+| `DATABASE_SCHEMA`  | `public`                     | Schema the connection uses. The tests set a separate schema per test.    |
+| `MAINTENANCE_MODE` | off                          | `1` shows the maintenance page (HTTP 503) for every request and skips database start-up. Used during cutover. |
+| `TEST_DATABASE_URL`| `postgresql://penny:penny@localhost:5432/penny_test` | Database the test suite uses.                       |
 
 Other settings live in `config.py`. The page size is `PER_PAGE` (15), and the app name shown in headers, titles and the footer is `APP_NAME` ("Penny Trail").
 
@@ -69,26 +77,40 @@ APP_ENV=production SECRET_KEY=<your-key> gunicorn -w 4 -b 0.0.0.0:8000 "app:app"
 
 Put a reverse proxy such as Nginx or Caddy in front of Gunicorn to terminate HTTPS. Production sets the session cookie to `Secure`, so logins only work over HTTPS. Gunicorn does not run on Windows; use WSL or a Linux host.
 
+### Running more than one server
+
+Several Gunicorn workers or app servers can share one PostgreSQL database. Give every server the same `DATABASE_URL` and the same `SECRET_KEY`, because sessions are signed with that key and must be accepted by every server. Migrations run safely at start-up, because the start-up code holds an advisory lock. Writes are single statements, so each save is either kept or not, with no partial data. If two people edit the same expense at the same moment, the last save wins.
+
 ## Running the tests
+
+Start the local database first (`docker compose up -d`), then:
 
 ```bash
 pytest
 ```
 
-The suite covers accounts, the profile and photo uploads, expense CRUD, validation, filters, sorting, pagination, the category and monthly charts, the monthly spend limit, CSV and PDF export, the policy pages, database migrations and security headers.
+The suite runs against PostgreSQL. If the database is unreachable, the whole suite is skipped with a message telling you how to start it.
+
+The suite covers accounts, the profile and photo uploads, expense CRUD, validation, filters, sorting, pagination, the category and monthly charts, the monthly spend limit, CSV and PDF export, the policy pages, database migrations, concurrent start-up, two servers sharing one database, the SQLite migration and verification commands, the maintenance page and security headers.
 
 ## Database
 
-The database schema is versioned with SQLite's `PRAGMA user_version`. On startup the app applies any pending migrations, each in its own transaction. To change the schema, add a function to `MIGRATIONS` in `expense_tracker/db.py`. Don't edit a migration that has already shipped.
+The app uses PostgreSQL, accessed with `psycopg` and plain SQL (no ORM). The schema version is recorded in a `schema_version` table. On startup the app applies any pending migrations under a database-wide advisory lock, so several servers or workers starting together apply each migration once. Each migration runs in its own transaction. To change the schema, add a function to `MIGRATIONS` in `expense_tracker/db.py`. Don't edit a migration that has already shipped.
 
 Current migrations:
 
-1. Users and expenses (converting the early float-based prototype to integer cents).
-2. Allow every category in the current list.
-3. Monthly spending limits, one optional row per user.
-4. Profiles: personal details and an optional photo, one row per user.
+1. Baseline schema: users, expenses (integer cents, categories), monthly limits and profiles (with photo as `bytea`). Equal to the SQLite schema version 4 that the app used before.
 
-Back up `expenses.db` before upgrading a database that holds real data.
+### Moving from SQLite
+
+The old single-file SQLite database is moved in a one-time operation. The source is opened read-only and is never changed, and the target must be empty:
+
+```bash
+flask --app app sqlite-import migrate --source /path/to/expenses.db
+flask --app app sqlite-import verify  --source /path/to/expenses.db
+```
+
+`verify` compares row counts, per-user totals in cents, profile photos and password hashes, and changes nothing. The full procedure, including backup, maintenance mode, the smoke check and rollback, is in [docs/cutover.md](docs/cutover.md). The SQLite schema history (versions 1 to 4) is kept in git history and under the `sqlite-final` tag.
 
 ## Project structure
 
@@ -96,18 +118,22 @@ Back up `expenses.db` before upgrading a database that holds real data.
 expense-tracker/
 ├── app.py                  # entry point (also used by Gunicorn as app:app)
 ├── config.py               # configuration classes per environment, page size, app name
+├── compose.yaml           # local PostgreSQL for development and tests
+├── docker/initdb/         # creates the penny_test database on first start
+├── docs/cutover.md         # SQLite to PostgreSQL cutover and rollback runbook
 ├── .env.example            # template for environment settings
 ├── requirements.txt        # pinned dependencies
 ├── pytest.ini
 ├── expense_tracker/
-│   ├── __init__.py         # create_app() factory, security headers, error pages, footer year
+│   ├── __init__.py         # create_app() factory, security headers, error pages, maintenance mode
 │   ├── auth.py             # register, login, logout, login_required
-│   ├── db.py               # SQLite connection and migrations
+│   ├── db.py               # PostgreSQL connection, schema_version, migrations
 │   ├── pages.py            # Terms & Conditions and Privacy Policy pages
 │   ├── profile.py          # profile details, avatar, photo upload and validation of images
 │   ├── routes.py           # list, sort, filter, charts, exports, expenses, monthly limit
+│   ├── sqlite_import.py    # one-time migrate and verify commands from the old SQLite file
 │   ├── validation.py       # input rules, categories, money parsing and formatting
-│   ├── templates/          # HTML pages (Jinja2), including base.html with the footer
+│   ├── templates/          # HTML pages (Jinja2), including base.html with the footer and maintenance.html
 │   └── static/
 │       ├── style.css       # styles for the app (light theme only)
 │       └── js/
@@ -115,16 +141,20 @@ expense-tracker/
 │           ├── monthly-chart.js    # monthly spending bars
 │           └── flash.js            # dismissible flash messages
 └── tests/
-    ├── conftest.py         # shared fixtures
+    ├── conftest.py         # shared fixtures: a PostgreSQL schema per test
     ├── test_auth.py
     ├── test_budget.py      # monthly spend limit
-    ├── test_db.py          # migrations and schema
+    ├── test_concurrency.py # two servers sharing one database
+    ├── test_db.py          # migrations, constraints and schema
     ├── test_expenses.py
+    ├── test_maintenance.py # maintenance page and 503 responses
     ├── test_monthly.py     # monthly spending endpoint
     ├── test_pages.py       # footer and policy pages
+    ├── test_postgres_behaviour.py  # JSON integers, case rules, sorting
     ├── test_profile.py     # profile details, avatar and photo uploads
     ├── test_security.py    # CSRF, headers, configuration checks
     ├── test_sorting.py     # column sorting
+    ├── test_sqlite_import.py  # migrate and verify commands
     └── test_summary.py     # category summary endpoint
 ```
 
@@ -174,4 +204,5 @@ Profile photos are stored in the database, not on disk, so backups of `expenses.
 - The monthly limit card updates when the page reloads, not in the background as the pie chart does.
 - The Terms & Conditions and Privacy Policy pages contain dummy operator details and example commitments. Replace them with your real details and have them reviewed before going live.
 - There is no self-service account deletion yet. The privacy policy directs users to email for deletion requests.
-- SQLite handles a single server well. For several servers writing at once, move to PostgreSQL.
+- The app is fully offline during the one-time move from SQLite. There is no read-only mode while the data is copied.
+- Rolling back to SQLite is possible only during the verification window before the app reopens. Changes saved on PostgreSQL after that cannot be carried back.

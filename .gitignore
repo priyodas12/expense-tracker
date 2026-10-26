@@ -1,6 +1,7 @@
 # Virtual environment
 venv/
 .venv/
+.idea
 
 # Secrets and local settings (.env.example is the tracked template)
 .env
@@ -22,4 +23,3 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
-CLAUDE.md

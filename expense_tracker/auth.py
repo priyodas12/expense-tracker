@@ -1,9 +1,10 @@
 import functools
 import re
-import sqlite3
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from psycopg.errors import UniqueViolation
 
 from expense_tracker.db import get_db
 
@@ -21,7 +22,7 @@ def load_logged_in_user():
         g.user = None
     else:
         g.user = get_db().execute(
-            "SELECT id, username FROM users WHERE id = ?", (user_id,)
+            "SELECT id, username FROM users WHERE id = %s", (user_id,)
         ).fetchone()
 
 
@@ -57,11 +58,12 @@ def register():
             db = get_db()
             try:
                 db.execute(
-                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                    "INSERT INTO users (username, password_hash) VALUES (%s, %s)",
                     (username, generate_password_hash(password)),
                 )
                 db.commit()
-            except sqlite3.IntegrityError:
+            except UniqueViolation:
+                db.rollback()
                 error = "Username is already taken."
             else:
                 current_app.logger.info("Registered user %s", username)
@@ -79,7 +81,7 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = get_db().execute(
-            "SELECT id, password_hash FROM users WHERE username = ?", (username,)
+            "SELECT id, password_hash FROM users WHERE lower(username) = lower(%s)", (username,)
         ).fetchone()
 
         if user is None or not check_password_hash(user["password_hash"], password):
