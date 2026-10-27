@@ -26,7 +26,6 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
 
 class TestingConfig(Config):

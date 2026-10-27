@@ -26,6 +26,7 @@ def test_csrf_token_required_when_enabled(pg_schema):
         {
             "DATABASE_URL": TEST_DATABASE_URL,
             "DATABASE_SCHEMA": pg_schema,
+            "SECRET_KEY": "csrf-test-key",
             "TESTING": True,
         },
     )
@@ -47,7 +48,10 @@ def test_csrf_token_required_when_enabled(pg_schema):
 def test_production_requires_secret_key(pg_schema, monkeypatch):
     monkeypatch.delenv("SECRET_KEY", raising=False)
     with pytest.raises(RuntimeError, match="SECRET_KEY is not set"):
-        create_app("production", {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_SCHEMA": pg_schema})
+        create_app(
+            "production",
+            {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_SCHEMA": pg_schema, "SECRET_KEY": None},
+        )
 
 
 def test_missing_database_url_is_rejected(pg_schema, monkeypatch):
@@ -69,3 +73,19 @@ def test_unreachable_database_error_does_not_leak_password():
 def test_unknown_environment_is_rejected(pg_schema):
     with pytest.raises(ValueError, match="Unknown APP_ENV"):
         create_app("staging", {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_SCHEMA": pg_schema})
+
+
+def test_unset_app_env_defaults_to_production(pg_schema, monkeypatch):
+    monkeypatch.delenv("APP_ENV", raising=False)
+    app = create_app(
+        None, {"DATABASE_URL": TEST_DATABASE_URL, "DATABASE_SCHEMA": pg_schema, "SECRET_KEY": "prod-test-key"}
+    )
+    assert app.config["DEBUG"] is False
+    assert app.config["SESSION_COOKIE_SECURE"] is True
+
+
+def test_development_has_no_fixed_secret_key():
+    from config import DevelopmentConfig
+
+    # The key must come from the environment, never from a value written in the code.
+    assert "SECRET_KEY" not in vars(DevelopmentConfig)

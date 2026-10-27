@@ -44,8 +44,8 @@ Settings come from environment variables, or from a `.env` file in the project r
 
 | Variable           | Default                      | Purpose                                                                 |
 |--------------------|------------------------------|-------------------------------------------------------------------------|
-| `APP_ENV`          | `development`                | `development`, `testing` or `production`. Production enables secure cookies. |
-| `SECRET_KEY`       | `dev-secret-change-me` (development only) | Signs sessions and CSRF tokens. **Required in production.** Must be identical on every server. |
+| `APP_ENV`          | `production` (`development` for `python app.py`) | `development`, `testing` or `production`. Production enables secure cookies and keeps debug off. |
+| `SECRET_KEY`       | none (**required**)          | Signs sessions and CSRF tokens. Required in every environment except testing. Must be identical on every server. |
 | `DATABASE_URL`     | none (**required**)          | PostgreSQL connection URL, e.g. `postgresql://user:password@host:5432/dbname`. |
 | `DATABASE_SCHEMA`  | `public`                     | Schema the connection uses. The tests set a separate schema per test.    |
 | `MAINTENANCE_MODE` | off                          | `1` shows the maintenance page (HTTP 503) for every request and skips database start-up. Used during cutover. |
@@ -65,7 +65,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 python app.py
 ```
 
-Open http://127.0.0.1:5000. This uses Flask's development server with debug mode on, so don't use it in production.
+Open http://127.0.0.1:5000. This uses Flask's development server with debug mode on, so don't use it in production. Running `app.py` directly defaults `APP_ENV` to `development`; other entry points (Gunicorn, `flask --app app ...`) default to `production`, so set `APP_ENV=development` in `.env` for local `flask` commands. `SECRET_KEY` must be set in `.env` (see above).
 
 ## Running in production
 
