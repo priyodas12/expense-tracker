@@ -116,3 +116,28 @@ def test_users_only_see_their_own_expenses(user, client):
     response = client.get("/")
     assert b"Alice rent" not in response.data
     assert b"No expenses found." in response.data
+
+
+def test_unknown_username_still_checks_a_password_hash(client, monkeypatch):
+    # Without this, logins for unknown usernames return faster and reveal which names exist.
+    import expense_tracker.auth as auth
+
+    calls = []
+    real_check = auth.check_password_hash
+    monkeypatch.setattr(auth, "check_password_hash", lambda h, p: calls.append(h) or real_check(h, p))
+
+    response = client.post("/auth/login", data={"username": "nobody", "password": PASSWORD})
+
+    assert b"Invalid username or password." in response.data
+    assert calls == [auth._DUMMY_PASSWORD_HASH]
+
+
+def test_failed_login_log_escapes_username(client, caplog):
+    caplog.set_level("INFO")
+    client.post("/auth/login", data={"username": "eve\nINFO forged entry" + "x" * 50, "password": PASSWORD})
+
+    messages = [r.getMessage() for r in caplog.records if "Failed login" in r.getMessage()]
+    assert len(messages) == 1
+    assert "\n" not in messages[0]
+    assert "\\n" in messages[0]
+    assert "x" * 50 not in messages[0]

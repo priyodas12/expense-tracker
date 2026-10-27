@@ -158,9 +158,8 @@
 
   {% if budget %}
   <p class="muted budget-month">{{ budget.month_label }}</p>
-  <div class="limit-track" role="progressbar" aria-label="Share of monthly limit spent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ budget.percent }}">
-    <span class="limit-fill{% if budget.over %} over{% endif %}" style="width: {{ budget.percent }}%"></span>
-  </div>
+  {# A native progress bar, because the CSP blocks inline style attributes. #}
+  <progress class="limit-bar{% if budget.over %} over{% endif %}" max="100" value="{{ budget.percent }}" aria-label="Share of monthly limit spent">{{ budget.percent }}%</progress>
   <div class="budget-summary">
     <span>Spent <strong>{{ budget.spent_cents|money }}</strong> of {{ budget.limit_cents|money }}</span>
     {% if budget.over %}

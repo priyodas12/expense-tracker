@@ -22,10 +22,11 @@ def create_app(config_name=None, overrides=None):
     """Build the Flask app.
 
     config_name: "development", "testing" or "production". Defaults to the
-    APP_ENV environment variable, then "development".
+    APP_ENV environment variable, then "production", so a server started without
+    APP_ENV never runs with debug on or insecure cookies.
     overrides: a dict of config values applied last, mainly for tests.
     """
-    config_name = config_name or os.environ.get("APP_ENV", "development")
+    config_name = config_name or os.environ.get("APP_ENV", "production")
     if config_name not in CONFIGS:
         raise ValueError(f"Unknown APP_ENV {config_name!r}. Use one of: {', '.join(CONFIGS)}.")
 

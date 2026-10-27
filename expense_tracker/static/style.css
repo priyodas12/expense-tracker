@@ -654,22 +654,43 @@ select {
   font-size: 0.875rem;
 }
 
-.limit-track {
+.limit-bar {
+  display: block;
+  width: 100%;
   height: 12px;
   margin: 8px 0;
+  border: 0;
   border-radius: 999px;
   background: var(--border);
   overflow: hidden;
+  appearance: none;
+  color: var(--accent);
 }
 
-.limit-fill {
-  display: block;
-  height: 100%;
+.limit-bar::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.limit-bar::-webkit-progress-value {
   border-radius: 999px;
   background: var(--accent);
 }
 
-.limit-fill.over {
+.limit-bar::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.limit-bar.over {
+  color: var(--danger);
+}
+
+.limit-bar.over::-webkit-progress-value {
+  background: var(--danger);
+}
+
+.limit-bar.over::-moz-progress-bar {
   background: var(--danger);
 }
 

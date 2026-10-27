@@ -14,6 +14,10 @@ USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{3,30}$")
 PASSWORD_MIN = 8
 PASSWORD_MAX = 128  # long enough for passphrases, short enough to keep hashing cheap
 
+# Checked against when the username doesn't exist, so a failed login takes the same
+# time either way and doesn't reveal which usernames are registered.
+_DUMMY_PASSWORD_HASH = generate_password_hash("not-a-real-password")
+
 
 @bp.before_app_request
 def load_logged_in_user():
@@ -84,9 +88,11 @@ def login():
             "SELECT id, password_hash FROM users WHERE lower(username) = lower(%s)", (username,)
         ).fetchone()
 
-        if user is None or not check_password_hash(user["password_hash"], password):
-            # Log the attempt without the password.
-            current_app.logger.info("Failed login attempt for username %s", username)
+        password_hash = user["password_hash"] if user else _DUMMY_PASSWORD_HASH
+        if not check_password_hash(password_hash, password) or user is None:
+            # Log the attempt without the password. The username is unvalidated input,
+            # so it is cut short and repr-escaped to keep line breaks out of the log.
+            current_app.logger.info("Failed login attempt for username %r", username[:30])
             flash("Invalid username or password.", "error")
         else:
             session.clear()

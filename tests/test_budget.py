@@ -45,7 +45,7 @@ def test_set_limit_shows_spent_and_left(user):
 
     assert b"Spent <strong>120.50</strong> of 500.00" in response.data
     assert b"<strong>379.50 left</strong>" in response.data
-    assert b'aria-valuenow="24.1"' in response.data
+    assert b'max="100" value="24.1"' in response.data
 
 
 def test_over_limit_shows_amount_over(user):
@@ -56,8 +56,19 @@ def test_over_limit_shows_amount_over(user):
     response = client.get("/")
 
     assert b"<strong class=\"over\">50.00 over limit</strong>" in response.data
-    assert b'class="limit-fill over"' in response.data
-    assert b'style="width: 100%"' in response.data
+    assert b'class="limit-bar over" max="100" value="100"' in response.data
+
+
+def test_limit_bar_has_no_inline_style(user):
+    # The CSP has no 'unsafe-inline' for styles, so a style attribute would be ignored.
+    client = user()
+    set_limit(client, "200")
+    add(client, "Groceries", "50", f"{this_month()}-03")
+
+    response = client.get("/")
+
+    assert b'value="25.0"' in response.data
+    assert b"style=" not in response.data
 
 
 def test_only_current_month_counts(user):

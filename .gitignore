@@ -2,6 +2,10 @@
 venv/
 .venv/
 .idea
+.specify
+venv
+venv/
+venvcd/
 
 # Secrets and local settings (.env.example is the tracked template)
 .env
